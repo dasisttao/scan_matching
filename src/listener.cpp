@@ -152,11 +152,13 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &
 {
   //Calc ego position
   vector<double> ego_pos = setEgoPose(gps_data);
-
+  float off_x = -sin(ego_pos[2] * M_PI / 180) * 0.2 * 0;
+  float off_y = cos(ego_pos[2] * M_PI / 180) * 2 * 0;
+  cout << off_x << " : " << off_y << endl;
   //Set State
   double offset = 1;
-  state.x = ego_pos[0] - 0.5 + 0.5;
-  state.y = ego_pos[1] + 1.5 - 1.5;
+  state.x = ego_pos[0] + off_x;
+  state.y = ego_pos[1] + off_y;
   state.v = gps_data->ins_vh.In_VXH;
   state.yaw = ego_pos[2];
   state.yawr = gps_data->rateshorizontal.RZH;

@@ -42,7 +42,7 @@ Matrix2f Filter::allignScanPoints(MyPointCloud2D &scans, const State &state, sen
         -sin(alpha), cos(alpha);
     for (int i = 0; i < scans.size; i++)
     {
-        temp << scans.pts[i].x, scans.pts[i].y;
+        temp << scans.pts[i].x - 1.9, scans.pts[i].y + 0.4;
         result = rot_M * temp + ego_pos;
         scans.pts[i].x = result(0);
         scans.pts[i].y = result(1);
