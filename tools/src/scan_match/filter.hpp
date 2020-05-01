@@ -12,14 +12,14 @@ class Filter
 
 public:
     Filter() = default;
-    MyPointCloud2D getScanPointsWithinThreshold(MyPointCloud2D scans, sensor_msgs::PointCloud2 &pc2);
-    Matrix2f allignScanPoints(MyPointCloud2D &scans, const State &state, sensor_msgs::PointCloud2 &pc2);
+    MyPointCloud2D getScanPointsWithinThreshold(MyPointCloud2D scans);
+    Matrix2f allignScanPoints(MyPointCloud2D &scans, const State &state);
     MyPointCloud2D reduceMap(MyPointCloud2D map_carpark, const State &state);
 
 private:
-    const float longi_max = 40;
-    const float longi_min = -40;
-    const float lateral_max = 25;
-    const float lateral_min = -25;
-    const float map_threshold = 40;
+    const float longi_max = 100;
+    const float longi_min = -100;
+    const float lateral_max = 100;
+    const float lateral_min = -100;
+    const float map_threshold = 100;
 };

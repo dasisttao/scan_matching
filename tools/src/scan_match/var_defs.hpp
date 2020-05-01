@@ -69,16 +69,3 @@ public:
     std::vector<MyPoint> pts;
     int size;
 };
-
-// std::chrono::_V2::system_clock::time_point time1;
-// void timeStart()
-// {
-//     time1 = std::chrono::high_resolution_clock::now();
-// }
-
-// void timeStop()
-// {
-//     std::chrono::_V2::system_clock::time_point time2 = std::chrono::high_resolution_clock::now();
-//     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(time2 - time1).count();
-//     std::cout << "ms :" << duration << endl;
-// }

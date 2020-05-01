@@ -43,10 +43,10 @@ Timer timer;
 ICP icp;
 RVIZ rviz;
 UkfNode ukfnode;
-bool init = true;
+bool init = false;
 State state;
-sensor_msgs::PointCloud2 pc2, pc2_allign, my_map;
-geometry_msgs::PoseStamped my_pose;
+sensor_msgs::PointCloud2 pc2, my_map;
+geometry_msgs::PoseStamped my_pose, my_pose_est;
 tf2::Quaternion myQuaternion;
 
 MyPointCloud2D createScanPoints(sensor_msgs::PointCloud msg)
@@ -139,7 +139,6 @@ vector<double> setEgoPose(const gpsData::ConstPtr &gps_data)
   my_pose.pose.position.x = utm_local_pt[0];
   my_pose.pose.position.y = utm_local_pt[1];
   my_pose.pose.position.z = 1;
-  myQuaternion.setRPY(gps_data->ins_angle_gps_course.Angle_Roll, gps_data->ins_angle_gps_course.Angle_Pitch, gps_data->ins_angle_gps_course.Angle_Yaw);
   my_pose.pose.orientation.z = 0;
   my_pose.pose.orientation.y = 1;
   my_pose.pose.orientation.x = 0;
@@ -150,27 +149,25 @@ vector<double> setEgoPose(const gpsData::ConstPtr &gps_data)
 
 void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &marker, const gpsData::ConstPtr &gps_data)
 {
+  if (!init)
+  {
+    readMap();
+    init = true;
+  }
+
   //Calc ego position
   vector<double> ego_pos = setEgoPose(gps_data);
-  float off_x = -sin(ego_pos[2] * M_PI / 180) * 0.2 * 0;
-  float off_y = cos(ego_pos[2] * M_PI / 180) * 2 * 0;
-  cout << off_x << " : " << off_y << endl;
   //Set State
-  double offset = 1;
-  state.x = ego_pos[0] + off_x;
-  state.y = ego_pos[1] + off_y;
+  state.x = ego_pos[0];
+  state.y = ego_pos[1];
   state.v = gps_data->ins_vh.In_VXH;
   state.yaw = ego_pos[2];
   state.yawr = gps_data->rateshorizontal.RZH;
 
-  // if (!init)
-  //  readMap();
-  // }
-  readMap(); //später nur einmal bei init
-
   //Transform Pointcloud2 into Pointcloud
   sensor_msgs::PointCloud pc;
   sensor_msgs::convertPointCloud2ToPointCloud(*point_cloud, pc);
+  //Filter roof scans
   pc = filterPC(pc);
 
   //Create ScanPoints vector for better handling
@@ -178,13 +175,27 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &
 
   //------Algorithm
   //--1--Reducing ScanPoints
-  // MyPointCloud2D scans_filt = filter.getScanPointsWithinThreshold(scans, pc2);
+  scans = filter.getScanPointsWithinThreshold(scans);
   //--2--Pre-Allignment (Vorausrichtung)
-  Matrix2f rotM = filter.allignScanPoints(scans, state, pc2_allign);
+  Matrix2f rotM = filter.allignScanPoints(scans, state);
   // //--3--Reduce points in map
-  // MyPointCloud2D map_filt = filter.reduceMap(map_carpark, state);
+  MyPointCloud2D map_filt = filter.reduceMap(map_carpark, state);
+  my_map = rviz.createPointCloud(map_filt, "ibeo_lux");
   // //--4--ICP Algorithmen
-  // icp.mainAlgorithm(map_filt, scans);
+  State new_state;
+  scans = icp.mainAlgorithm(map_filt, scans, state, new_state);
+  pc2 = rviz.createPointCloud(scans, "ibeo_lux");
+  cout << "Old x: " << state.x << " New x: " << new_state.x << endl;
+  cout << "Old y: " << state.y << " New y: " << new_state.y << endl;
+
+  //Set Pose_est for rviz (debugging)
+  my_pose_est.pose.position.x = new_state.x;
+  my_pose_est.pose.position.y = new_state.y;
+  my_pose_est.pose.position.z = 1;
+  my_pose_est.pose.orientation.z = 0;
+  my_pose_est.pose.orientation.y = 1;
+  my_pose_est.pose.orientation.x = 0;
+  my_pose_est.pose.orientation.w = 1;
 }
 
 int main(int argc, char **argv)
@@ -206,16 +217,20 @@ int main(int argc, char **argv)
   auto pc_pub = nh.advertise<sensor_msgs::PointCloud2>("my_point_cloud", 30);
   auto map_pub = nh.advertise<sensor_msgs::PointCloud2>("my_map", 30);
   auto pose_pub = nh.advertise<geometry_msgs::PoseStamped>("my_pose", 30);
+  auto pose_est_pub = nh.advertise<geometry_msgs::PoseStamped>("my_pose_est", 30);
   ros::Rate rate(30);
   while (ros::ok())
   {
-    pc2_allign.header.stamp = ros::Time::now();
-    pc_pub.publish(pc2_allign);
+    pc2.header.stamp = ros::Time::now();
+    pc_pub.publish(pc2);
     my_map.header.stamp = ros::Time::now();
     map_pub.publish(my_map);
     my_pose.header.stamp = ros::Time::now();
     my_pose.header.frame_id = "ibeo_lux";
     pose_pub.publish(my_pose);
+    my_pose_est.header.stamp = ros::Time::now();
+    my_pose_est.header.frame_id = "ibeo_lux";
+    pose_est_pub.publish(my_pose_est);
     ros::spinOnce();
     rate.sleep();
   }

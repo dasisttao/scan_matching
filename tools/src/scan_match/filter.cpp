@@ -2,7 +2,7 @@
 #include <chrono>
 
 RVIZ rviz;
-MyPointCloud2D Filter::getScanPointsWithinThreshold(MyPointCloud2D scans, sensor_msgs::PointCloud2 &pc2)
+MyPointCloud2D Filter::getScanPointsWithinThreshold(MyPointCloud2D scans)
 {
     MyPointCloud2D scans_filt;
     MyPoint temp_pt;
@@ -22,12 +22,10 @@ MyPointCloud2D Filter::getScanPointsWithinThreshold(MyPointCloud2D scans, sensor
         }
     }
     scans_filt.size = scans_filt.ids.size();
-    pc2 = rviz.createPointCloud(scans_filt, "ibeo_lux");
-
     return scans_filt;
 }
 
-Matrix2f Filter::allignScanPoints(MyPointCloud2D &scans, const State &state, sensor_msgs::PointCloud2 &pc2)
+Matrix2f Filter::allignScanPoints(MyPointCloud2D &scans, const State &state)
 {
     Matrix2f rot_M;
     Vector2f ego_pos;
@@ -47,7 +45,6 @@ Matrix2f Filter::allignScanPoints(MyPointCloud2D &scans, const State &state, sen
         scans.pts[i].x = result(0);
         scans.pts[i].y = result(1);
     }
-    pc2 = rviz.createPointCloud(scans, "ibeo_lux");
     return rot_M;
 }
 

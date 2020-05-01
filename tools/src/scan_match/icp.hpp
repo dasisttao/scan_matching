@@ -12,14 +12,15 @@ class ICP
 public:
     ICP() = default;
     void calcEqPoints(MyPointCloud2D map_corrs, MyPointCloud2D scans, Matrix2f &R, Vector2f &T);
-    MyPointCloud2D verwerfung(float filt_distance, MyPointCloud2D &map_corrs, const MyPointCloud2D &scans);
+    MyPointCloud2D verwerfung(float filt_distance, MyPointCloud2D &map_corrs, const MyPointCloud2D &scans, const MyPointCloud2D &map_carpark);
     float getFiltDistance(float error_before_matching, float ratio_corres_last_timestep);
     void createPointCloud2D(PointCloud2D<float> &cloudMap, PointCloud2D<float> &cloudScan, const MyPointCloud2D &map_carpark, const MyPointCloud2D &scans);
-    MyPointCloud2D findNeigherstNeighbor(const PointCloud2D<float> &map_carpark, const PointCloud2D<float> &scans, float &distance_total_corrs_sqr, const my_kd_tree_t &index);
-    void mainAlgorithm(const MyPointCloud2D &map_carpark, const MyPointCloud2D &scans);
+    MyPointCloud2D findNeigherstNeighbor(const PointCloud2D<float> &map_carpark, const PointCloud2D<float> &scans, MyPointCloud2D &my_scans, float &distance_total_corrs_sqr, const my_kd_tree_t &index);
+    State matchingResult(const vector<Matrix2f> &TR, const vector<Vector2f> &TT, State state);
+    MyPointCloud2D mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointCloud2D &scans, State state, State &new_state);
 
 private:
-    const size_t number_of_iterations = 50;
+    const size_t number_of_iterations = 1;
     const size_t number_of_results = 1;
 
 private:
