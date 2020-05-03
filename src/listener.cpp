@@ -147,6 +147,14 @@ vector<double> setEgoPose(const gpsData::ConstPtr &gps_data)
   return utm_local_pt;
 }
 
+float RandomFloat(float a, float b)
+{
+  float random = ((float)rand()) / (float)RAND_MAX;
+  float diff = b - a;
+  float r = random * diff;
+  return a + r;
+}
+
 void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &marker, const gpsData::ConstPtr &gps_data)
 {
   if (!init)
@@ -185,8 +193,8 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &
   State new_state;
   scans = icp.mainAlgorithm(map_filt, scans, state, new_state);
   pc2 = rviz.createPointCloud(scans, "ibeo_lux");
-  cout << "Old x: " << state.x << " New x: " << new_state.x << endl;
-  cout << "Old y: " << state.y << " New y: " << new_state.y << endl;
+  // cout << "Old x: " << state.x << " New x: " << new_state.x << endl;
+  // cout << "Old y: " << state.y << " New y: " << new_state.y << endl;
 
   //Set Pose_est for rviz (debugging)
   my_pose_est.pose.position.x = new_state.x;

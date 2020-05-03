@@ -1,20 +1,21 @@
 #include "icp.hpp"
 #include <chrono>
 
-void ICP::calcEqPoints(MyPointCloud2D map_corrs, MyPointCloud2D scans, Matrix2f &R, Vector2f &T)
+void ICP::calcEqPoints(MyPointCloud2D map_corrs, MyPointCloud2D scans, Matrix2d &R, Vector2d &T)
 {
 
     //---Find data centroid and deviations from centroid (Map)
-    Vector2f map_bar;
-    Vector2f scan_bar;
+    Vector2d map_bar;
+    Vector2d scan_bar;
 
     for (size_t i = 0; i < map_corrs.size; i++)
     {
-        map_bar(0) += map_corrs.pts[i].x * map_corrs.weights[i];
-        map_bar(1) += map_corrs.pts[i].y * map_corrs.weights[i];
-        scan_bar(0) += scans.pts[i].x * map_corrs.weights[i];
-        scan_bar(1) += scans.pts[i].y * map_corrs.weights[i];
+        map_bar(0) += map_corrs.pts[i].x * scans.weights[i];
+        map_bar(1) += map_corrs.pts[i].y * scans.weights[i];
+        scan_bar(0) += scans.pts[i].x * scans.weights[i];
+        scan_bar(1) += scans.pts[i].y * scans.weights[i];
     }
+
     for (size_t i = 0; i < map_corrs.size; i++)
     {
         map_corrs.pts[i].x -= map_bar(0);
@@ -30,9 +31,10 @@ void ICP::calcEqPoints(MyPointCloud2D map_corrs, MyPointCloud2D scans, Matrix2f 
         // scans.points(i, 0) *= map_corrs.weights[i]; //wird nicht genutzt laut Matlab code
         // scans.points(i, 1) *= map_corrs.weights[i];
     }
-    //---Multiplying map with scan points (Transform Algorithm)
-    Matrix2f N;
-    float a, b, c, d = 0;
+    // ---Multiplying map with scan points(Transform Algorithm)
+    Matrix2d N;
+    double a = 0, b = 0, c = 0, d = 0;
+
     for (size_t i = 0; i < map_corrs.size; i++)
     {
         a += scans.pts[i].x * map_corrs.pts[i].x;
@@ -41,10 +43,11 @@ void ICP::calcEqPoints(MyPointCloud2D map_corrs, MyPointCloud2D scans, Matrix2f 
         d += scans.pts[i].y * map_corrs.pts[i].y;
     }
     N << a, b, c, d;
-    Eigen::JacobiSVD<Matrix2f> svd;
+
+    Eigen::JacobiSVD<Matrix2d> svd;
     svd.compute(N, ComputeFullU | ComputeFullV);
-    float detUV = (svd.matrixU() * svd.matrixV().transpose()).determinant();
-    Matrix2f diagUV;
+    double detUV = (svd.matrixU() * svd.matrixV().transpose()).determinant();
+    Matrix2d diagUV;
     diagUV << 1, 0, 0, detUV;
     R = svd.matrixV() * diagUV * svd.matrixU().transpose();
     T = map_bar - R * scan_bar;
@@ -159,19 +162,60 @@ MyPointCloud2D ICP::findNeigherstNeighbor(const PointCloud2D<float> &cloudMap, c
     return map_corrs;
 }
 
-State ICP::matchingResult(const vector<Matrix2f> &TR, const vector<Vector2f> &TT, State state)
+State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT, State state)
 {
     State new_state;
-    Vector2f new_pos;
-    Vector2f pos;
+    Vector2d new_pos;
+    Vector2d pos;
     pos << state.x, state.y;
-    new_pos = TR[0] * pos + TT[0];
+
+    new_pos = TR[number_of_iterations] * pos + TT[number_of_iterations];
     new_state.x = new_pos(0);
     new_state.y = new_pos(1);
     new_state.v = state.v;
     new_state.yaw = state.yaw;
     new_state.yawr = state.yawr;
     return new_state;
+}
+
+void ICP::calcWeights(MyPointCloud2D &scans)
+{
+    int i = 0;
+    float sum_weights = 0;
+    for (i = 0; i < scans.pts.size(); i++)
+    {
+        float sum_dist = 0;
+        int index = scans.ids[i];
+        for (int j = 0; j < scans.pts.size(); j++)
+        {
+            if ((i != j) && (index = scans.ids[j]))
+            {
+                sum_dist += scans.distances[j];
+            }
+        }
+        if (sum_dist != 0)
+        {
+            scans.weights[i] = scans.distances[i] / sum_dist;
+        }
+        else
+        {
+            scans.weights[i] = 1;
+        }
+        sum_weights += scans.weights[i];
+    }
+    //Normalize
+    for (int n = 0; n < scans.pts.size(); n++)
+    {
+
+        if (sum_weights > 0)
+        {
+            scans.weights[n] /= sum_weights;
+        }
+        else
+        {
+            scans.weights[n] = 1;
+        }
+    }
 }
 
 MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointCloud2D &scans, State state, State &new_state)
@@ -183,27 +227,21 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
     my_kd_tree_t index(2 /*dim*/, cloudMap, nanoflann::KDTreeSingleIndexAdaptorParams(10 /*max leaf*/));
     // kd-Baum erstellen
     index.buildIndex();
-    MyPointCloud2D map_corrs, scans_kd, test;
+    MyPointCloud2D map_corrs, scans_kd;
     vector<float> error;
     error.resize(number_of_iterations);
-    Matrix2f R;
-    Vector2f T;
-    vector<Matrix2f> TR;
-    vector<Vector2f> TT;
-    TR.resize(number_of_iterations);
-    TT.resize(number_of_iterations);
+    Matrix2d R;
+    Vector2d T;
+    vector<Matrix2d> TR;
+    vector<Vector2d> TT;
+    TR.resize(number_of_iterations + 1);
+    TT.resize(number_of_iterations + 1);
     // Init Transformation Vectors & Matrixs
-    for (Vector2f &vec : TT)
-    {
-        vec << 0, 0;
-    }
-    for (Matrix2f &mat : TR)
-    {
-        mat << 1, 0, 0, 1;
-    }
+    TR[0] << 1, 0, 0, 1;
+    TT[0] << 0, 0;
     //----Init done-----
 
-    // ICP - Iterations
+    // ICP - Iterations - Iteration unnötig?
     for (size_t iterICP = 0; iterICP < number_of_iterations; iterICP++)
     {
 
@@ -211,43 +249,27 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
         if (iterICP == 0)
         {
             map_corrs = findNeigherstNeighbor(cloudMap, cloudScan, scans, distance_total_sqr, index);
-            test = map_corrs;
             error[iterICP] = sqrt(distance_total_sqr / map_corrs.size);
             float filt_distance = getFiltDistance(error[iterICP], 0.1 /*timestep => später variable*/);
             scans_kd = verwerfung(filt_distance, map_corrs, scans, map_carpark);
         }
         else
         {
-            map_corrs = findNeigherstNeighbor(cloudMap, cloudScan, scans, distance_total_sqr, index);
-            // scans_kd = scans;
+            // Im Matlab Code , aber unnötig?
+            // map_corrs = findNeigherstNeighbor(cloudMap, cloudScan, scans_kd, distance_total_sqr, index);
         }
-        // //---Calculate Weights
-        // calcWeights(kd_scans);
+        //---Calculate Weights
+        calcWeights(scans_kd);
         //---Calculate Transformation with weights
         calcEqPoints(map_corrs, scans_kd, R, T); //R & T als Referenz
+
         // //---Save transformation of iteration
-        TR[iterICP] = R * TR[iterICP];
-        TT[iterICP] = R * TT[iterICP] + T;
-        // //Last Transformation
-        // MatrixXf pt_filtered;
-        // pt_filtered = transformationFilteredScans(scan_points_filtered, TR[IterICP + 1], TT[IterICP + 1]);
-        // //New Transformaton
-        // MatrixXf pt_all;
-        // pt_all = transformationAllScans(scan_points, TR[IterICP + 1], TT[IterICP + 1]);
-        // //Error for this iteration
-        // vector<NearestScanPoint> kd_scans_check;
-        // MyPointCloud2D<float> cloudMap_check;
-        // MyPointCloud2D<float> cloudScan_check;
-        // ScanPoints pt_all_sp = Matrix2fToScanpoints(pt_all);
-        // createPointCloud2D(cloudMap_check, cloudScan_check, map_park.size(), scan_points.size(), map_park, pt_all_sp);
-        // kd_scans_check = findNeigherstNeighbor(cloudMap, cloudScan, distance_total_corrs_sqr, resultSet, index);
+        TR[iterICP + 1] = R * TR[iterICP];
+        TT[iterICP + 1] = R * TT[iterICP] + T;
     }
+
     new_state = matchingResult(TR, TT, state);
     // timer.stop("kd");
-    return map_corrs;
-    // for (int i = 0; i < number_of_iterations + 1; i++)
-    // {
-    //     // cout << "TR: " << TR[i] << endl;
-    //     cout << "TT: " << TT[i] << endl;
-    // }
+    //Return scans_kd für rviz
+    return scans_kd;
 }
