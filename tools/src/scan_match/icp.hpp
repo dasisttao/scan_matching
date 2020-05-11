@@ -21,7 +21,7 @@ public:
     MyPointCloud2D mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointCloud2D &scans, State state, State &new_state);
 
 private:
-    const size_t number_of_iterations = 1;
+    const size_t number_of_iterations = 3;
     const size_t number_of_results = 1;
 
 private:

@@ -33,14 +33,14 @@ Matrix2f Filter::allignScanPoints(MyPointCloud2D &scans, const State &state)
     Vector2f result;
     ego_pos << state.x, state.y;
 
-    double alpha = ((state.yaw - 90) * PI / 180.0);
+    double alpha = (state.yaw) * M_PI / 180;
     rot_M
         << cos(alpha),
         sin(alpha),
         -sin(alpha), cos(alpha);
     for (int i = 0; i < scans.size; i++)
     {
-        temp << scans.pts[i].x - 1.9, scans.pts[i].y + 0.4;
+        temp << scans.pts[i].x - 1.5, scans.pts[i].y + 0.45; // Scans verruscht.. -1.5 und +0.45 als Korrektur (FÜRS ERSTE!)
         result = rot_M * temp + ego_pos;
         scans.pts[i].x = result(0);
         scans.pts[i].y = result(1);

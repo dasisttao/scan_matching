@@ -1,4 +1,3 @@
-
 #include <ros/ros.h>
 #include <iostream>
 #include <std_msgs/Header.h>
@@ -48,6 +47,9 @@ State state;
 sensor_msgs::PointCloud2 pc2, my_map;
 geometry_msgs::PoseStamped my_pose, my_pose_est;
 tf2::Quaternion myQuaternion;
+ros::Publisher my_true_path;
+ros::Publisher my_est_path;
+nav_msgs::Path my_est_path_msg, my_true_path_msg;
 
 MyPointCloud2D createScanPoints(sensor_msgs::PointCloud msg)
 {
@@ -133,7 +135,7 @@ vector<double> setEgoPose(const gpsData::ConstPtr &gps_data)
 
   //Transform from UTM to Local
   utm_local_pt = ukfnode.UTM2Local(utm_pt);
-  utm_local_pt[2] = utm_yaw;
+  utm_local_pt[2] = utm_yaw - 90;
 
   //Set Pose for rviz (debugging)
   my_pose.pose.position.x = utm_local_pt[0];
@@ -157,11 +159,12 @@ float RandomFloat(float a, float b)
 
 void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &marker, const gpsData::ConstPtr &gps_data)
 {
-  if (!init)
-  {
-    readMap();
-    init = true;
-  }
+  readMap();
+  // if (!init)
+  // {
+  //   readMap();
+  //   init = true;
+  // }
 
   //Calc ego position
   vector<double> ego_pos = setEgoPose(gps_data);
@@ -186,17 +189,17 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &
   scans = filter.getScanPointsWithinThreshold(scans);
   //--2--Pre-Allignment (Vorausrichtung)
   Matrix2f rotM = filter.allignScanPoints(scans, state);
-  // //--3--Reduce points in map
+  //--3--Reduce points in map
   MyPointCloud2D map_filt = filter.reduceMap(map_carpark, state);
   my_map = rviz.createPointCloud(map_filt, "ibeo_lux");
   // //--4--ICP Algorithmen
   State new_state;
   scans = icp.mainAlgorithm(map_filt, scans, state, new_state);
   pc2 = rviz.createPointCloud(scans, "ibeo_lux");
-  // cout << "Old x: " << state.x << " New x: " << new_state.x << endl;
-  // cout << "Old y: " << state.y << " New y: " << new_state.y << endl;
+  // // cout << "Old x: " << state.x << " New x: " << new_state.x << endl;
+  // // cout << "Old y: " << state.y << " New y: " << new_state.y << endl;
 
-  //Set Pose_est for rviz (debugging)
+  // Set Pose_est for rviz (debugging)
   my_pose_est.pose.position.x = new_state.x;
   my_pose_est.pose.position.y = new_state.y;
   my_pose_est.pose.position.z = 1;
