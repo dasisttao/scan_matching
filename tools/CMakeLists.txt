@@ -9,6 +9,8 @@ add_library(
     src/scan_match/utils.hpp
     src/scan_match/utils.cpp
     src/scan_match/var_defs.hpp
+    src/scan_match/particle_filter.hpp
+    src/scan_match/particle_filter.cpp
 )
 add_library(csv INTERFACE)
 add_library(kdtree INTERFACE)

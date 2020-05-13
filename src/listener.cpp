@@ -70,7 +70,7 @@ MyPointCloud2D createScanPoints(sensor_msgs::PointCloud msg)
   return scan_points;
 }
 
-void readMap()
+void readMapUTM()
 {
   double x, y;
   MyPoint map_pt;
@@ -89,6 +89,44 @@ void readMap()
     utm_local_pt = ukfnode.UTM2Local(utm_pt);
     map_pt.x = utm_local_pt[0];
     map_pt.y = utm_local_pt[1];
+    map_carpark.pts.push_back(map_pt);
+    map_carpark.weights.push_back(1);
+    map_carpark.distances.push_back(0);
+    i++;
+  }
+  my_map = rviz.createPointCloud(map_carpark, "ibeo_lux");
+
+  map_carpark.size = i;
+}
+
+void rotatePoint(double &x, double &y, double alpha)
+{
+  Vector2d temp;
+  Vector2d result;
+  Matrix2d rot_M;
+  alpha = alpha * M_PI / 180;
+  rot_M << cos(alpha),
+      -sin(alpha),
+      sin(alpha), cos(alpha);
+  temp << x, y;
+  result = rot_M * temp;
+  x = result(0);
+  y = result(1);
+}
+void readMapLocal()
+{
+  double x, y;
+  MyPoint map_pt;
+  io::CSVReader<2> in2("src/scan_matching/map/parkhaus.csv");
+  //Local X , Local Y
+  in2.read_header(io::ignore_extra_column, "x", "y");
+  int i = 0;
+  while (in2.read_row(x, y))
+  {
+    map_carpark.ids.push_back(i);
+    rotatePoint(x, y, -73.7); //+ gegen Uhrzeiger
+    map_pt.x = x + 6.8;       // + obenrechts
+    map_pt.y = y - 0.9;       // -minus untenrechts
     map_carpark.pts.push_back(map_pt);
     map_carpark.weights.push_back(1);
     map_carpark.distances.push_back(0);
@@ -140,6 +178,7 @@ vector<double> setEgoPose(const gpsData::ConstPtr &gps_data)
   //Set Pose for rviz (debugging)
   my_pose.pose.position.x = utm_local_pt[0];
   my_pose.pose.position.y = utm_local_pt[1];
+  cout << my_pose.pose.position.x << " | " << my_pose.pose.position.y << endl;
   my_pose.pose.position.z = 1;
   my_pose.pose.orientation.z = 0;
   my_pose.pose.orientation.y = 1;
@@ -156,24 +195,41 @@ float RandomFloat(float a, float b)
   float r = random * diff;
   return a + r;
 }
-
+State new_state;
+double time_us_;
 void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &marker, const gpsData::ConstPtr &gps_data)
 {
-  readMap();
-  // if (!init)
-  // {
-  //   readMap();
-  //   init = true;
-  // }
-
+  // readMapLocal();
+  readMapUTM();
   //Calc ego position
   vector<double> ego_pos = setEgoPose(gps_data);
-  //Set State
-  state.x = ego_pos[0];
-  state.y = ego_pos[1];
   state.v = gps_data->ins_vh.In_VXH;
   state.yaw = ego_pos[2];
   state.yawr = gps_data->rateshorizontal.RZH;
+  double tnow = gps_data->header.stamp.toSec();
+  if (!init)
+  {
+    // readMapUTM();
+    init = true;
+    state.x = ego_pos[0];
+    state.y = ego_pos[1];
+    time_us_ = gps_data->header.stamp.toSec();
+  }
+  else
+  {
+
+    double dt = tnow - time_us_;
+    state.x = new_state.x + state.v * dt * cos((state.yaw - 90 + 90) * M_PI / 180);
+    state.y = new_state.y - state.v * dt * sin((state.yaw - 90 + 90) * M_PI / 180);
+
+    // state.x = new_state.x;
+    // state.y = new_state.y;
+  }
+
+  // cout << ego_pos[0] << " | " << ego_pos[1] << endl;
+  //Set State
+  // state.x = ego_pos[0];
+  // state.y = ego_pos[1];
 
   //Transform Pointcloud2 into Pointcloud
   sensor_msgs::PointCloud pc;
@@ -193,20 +249,22 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &
   MyPointCloud2D map_filt = filter.reduceMap(map_carpark, state);
   my_map = rviz.createPointCloud(map_filt, "ibeo_lux");
   // //--4--ICP Algorithmen
-  State new_state;
+
   scans = icp.mainAlgorithm(map_filt, scans, state, new_state);
   pc2 = rviz.createPointCloud(scans, "ibeo_lux");
-  // // cout << "Old x: " << state.x << " New x: " << new_state.x << endl;
-  // // cout << "Old y: " << state.y << " New y: " << new_state.y << endl;
+  // // // cout << "Old x: " << state.x << " New x: " << new_state.x << endl;
+  // // // cout << "Old y: " << state.y << " New y: " << new_state.y << endl;
 
   // Set Pose_est for rviz (debugging)
   my_pose_est.pose.position.x = new_state.x;
   my_pose_est.pose.position.y = new_state.y;
+  // cout << new_state.x << " | " << new_state.y << endl;
   my_pose_est.pose.position.z = 1;
   my_pose_est.pose.orientation.z = 0;
   my_pose_est.pose.orientation.y = 1;
   my_pose_est.pose.orientation.x = 0;
   my_pose_est.pose.orientation.w = 1;
+  time_us_ = tnow;
 }
 
 int main(int argc, char **argv)
