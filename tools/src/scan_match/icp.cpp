@@ -164,18 +164,30 @@ MyPointCloud2D ICP::findNeigherstNeighbor(const PointCloud2D<float> &cloudMap, c
     return map_corrs;
 }
 
-State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT, State state)
+State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT, State state, Matrix2d &rotM)
 {
     State new_state;
     Vector2d new_pos;
     Vector2d pos;
+    Matrix2d new_rot;
     pos << state.x, state.y;
 
     new_pos = TR[number_of_iterations] * pos + TT[number_of_iterations];
+    new_rot = TR[number_of_iterations] * rotM;
     new_state.x = new_pos(0);
     new_state.y = new_pos(1);
     new_state.v = state.v;
     new_state.yaw = state.yaw;
+    //new yaw
+    // if (abs(state.yaw + acos(TR[number_of_iterations](0, 0))) < M_PI)
+    // {
+    //     new_state.yaw = acos(new_rot(0, 0));
+    // }
+    // else
+    // {
+    //     new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
+    // }
+
     new_state.yawr = state.yawr;
     return new_state;
 }
@@ -228,7 +240,7 @@ void transformLast(Matrix2d TR, Vector2d TT, MyPointCloud2D &scans_kd)
         scans_kd.pts[i].y = TR(1, 0) * scans_kd.pts[i].x + TR(1, 1) * scans_kd.pts[i].y + TT(1);
     }
 }
-MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointCloud2D &scans, State state, State &new_state)
+MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointCloud2D &scans, State state, State &new_state, Matrix2d &rotM)
 {
     //---Init---
     PointCloud2D<float> cloudMap, cloudScan;
@@ -259,6 +271,7 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
         if (iterICP == 0)
         {
             map_corrs = findNeigherstNeighbor(cloudMap, cloudScan, scans, distance_total_sqr, index);
+
             error[iterICP] = sqrt(distance_total_sqr / map_corrs.size);
             float filt_distance = getFiltDistance(error[iterICP], 0.1 /*timestep => später variable*/);
             scans_kd = verwerfung(filt_distance, map_corrs, scans, map_carpark);
@@ -269,8 +282,10 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
             // Im Matlab Code , aber unnötig?
             map_corrs = findNeigherstNeighbor(cloudMap, cloudScan, scans_kd, distance_total_sqr, index);
         }
+
         //---Calculate Weights
         calcWeights(scans_kd);
+
         //---Calculate Transformation with weights
         calcEqPoints(map_corrs, scans_kd, R, T); //R & T als Referenz
 
@@ -282,7 +297,8 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
         transformLast(TR[iterICP + 1], TT[iterICP + 1], scans_kd);
     }
 
-    new_state = matchingResult(TR, TT, state);
+    new_state = matchingResult(TR, TT, state, rotM);
+
     // timer.stop("kd");
     //Return scans_kd für rviz
     return scans_kd;

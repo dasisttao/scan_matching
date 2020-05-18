@@ -13,7 +13,7 @@ class Timer
 {
 public:
     void start();
-    void stop(string msg);
+    double stop();
 
 private:
     std::chrono::_V2::system_clock::time_point beg;

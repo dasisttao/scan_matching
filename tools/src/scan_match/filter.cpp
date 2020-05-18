@@ -25,15 +25,15 @@ MyPointCloud2D Filter::getScanPointsWithinThreshold(MyPointCloud2D scans)
     return scans_filt;
 }
 
-Matrix2f Filter::allignScanPoints(MyPointCloud2D &scans, const State &state)
+Matrix2d Filter::allignScanPoints(MyPointCloud2D &scans, const State &state)
 {
-    Matrix2f rot_M;
-    Vector2f ego_pos;
-    Vector2f temp;
-    Vector2f result;
+    Matrix2d rot_M;
+    Vector2d ego_pos;
+    Vector2d temp;
+    Vector2d result;
     ego_pos << state.x, state.y;
 
-    double alpha = (state.yaw) * M_PI / 180;
+    double alpha = (-state.yaw);
     rot_M
         << cos(alpha),
         sin(alpha),

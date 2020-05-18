@@ -5,11 +5,11 @@ void Timer::start()
 {
     beg = std::chrono::high_resolution_clock::now();
 }
-void Timer::stop(string msg)
+double Timer::stop()
 {
     end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - beg).count();
-    std::cout << "ms " << msg << " : " << duration << endl;
+    return double(duration);
 }
 
 sensor_msgs::PointCloud2 RVIZ::createPointCloud(MyPointCloud2D my_pc, string frame_id)

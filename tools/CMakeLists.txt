@@ -15,12 +15,14 @@ add_library(
 add_library(csv INTERFACE)
 add_library(kdtree INTERFACE)
 add_library(gps_transforms INTERFACE)
-
+add_library(ukf2 INTERFACE)
 
 
 target_include_directories(scan_match PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" )
 target_include_directories(csv INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src" )
 target_include_directories(kdtree INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src" )
 target_include_directories(gps_transforms INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src" )
+target_include_directories(ukf2 INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src" )
+
 
 target_compile_definitions(scan_match PUBLIC SCAN_MATCH_VERSION=4)

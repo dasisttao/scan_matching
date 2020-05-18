@@ -13,7 +13,7 @@ class Filter
 public:
     Filter() = default;
     MyPointCloud2D getScanPointsWithinThreshold(MyPointCloud2D scans);
-    Matrix2f allignScanPoints(MyPointCloud2D &scans, const State &state);
+    Matrix2d allignScanPoints(MyPointCloud2D &scans, const State &state);
     MyPointCloud2D reduceMap(MyPointCloud2D map_carpark, const State &state);
 
 private:
