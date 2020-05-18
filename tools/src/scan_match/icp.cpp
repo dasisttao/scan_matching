@@ -178,15 +178,15 @@ State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT
     new_state.y = new_pos(1);
     new_state.v = state.v;
     new_state.yaw = state.yaw;
-    //new yaw
-    // if (abs(state.yaw + acos(TR[number_of_iterations](0, 0))) < M_PI)
-    // {
-    //     new_state.yaw = acos(new_rot(0, 0));
-    // }
-    // else
-    // {
-    //     new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
-    // }
+
+    if (abs(state.yaw + acos(TR[number_of_iterations](0, 0))) < M_PI)
+    {
+        new_state.yaw = acos(new_rot(0, 0));
+    }
+    else
+    {
+        new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
+    }
 
     new_state.yawr = state.yawr;
     return new_state;
@@ -271,7 +271,6 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
         if (iterICP == 0)
         {
             map_corrs = findNeigherstNeighbor(cloudMap, cloudScan, scans, distance_total_sqr, index);
-
             error[iterICP] = sqrt(distance_total_sqr / map_corrs.size);
             float filt_distance = getFiltDistance(error[iterICP], 0.1 /*timestep => später variable*/);
             scans_kd = verwerfung(filt_distance, map_corrs, scans, map_carpark);
@@ -281,6 +280,10 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
         {
             // Im Matlab Code , aber unnötig?
             map_corrs = findNeigherstNeighbor(cloudMap, cloudScan, scans_kd, distance_total_sqr, index);
+            error[iterICP] = sqrt(distance_total_sqr / map_corrs.size);
+            float filt_distance = getFiltDistance(error[iterICP], 0.1 /*timestep => später variable*/);
+            scans_kd = verwerfung(filt_distance, map_corrs, scans, map_carpark);
+            createPointCloud2D(cloudMap, cloudScan, map_corrs, scans_kd);
         }
 
         //---Calculate Weights
@@ -296,6 +299,11 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
         // LastTransform (Matlab)
         transformLast(TR[iterICP + 1], TT[iterICP + 1], scans_kd);
     }
+    for (int i = 0; i < error.size(); i++)
+    {
+        cout << "error: " << error[i] << endl;
+    }
+    cout << "_______________" << endl;
 
     new_state = matchingResult(TR, TT, state, rotM);
 

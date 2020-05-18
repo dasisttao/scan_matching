@@ -238,10 +238,13 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &
     {
       // cout << "pred vor: " << ukf_filter.x_(3) << endl;
       // ukf_filter.Prediction(dt);
-      cout << "dt: " << dt << endl;
+
       // cout << "pred nach: " << ukf_filter.x_(3) << endl;
-      // ukf_filter.x_(0) = ukf_filter.x_(0) + ukf_filter.x_(2) * dt * cos(ukf_filter.x_(3));
-      // ukf_filter.x_(1) = ukf_filter.x_(1) + ukf_filter.x_(2) * dt * sin(ukf_filter.x_(3));
+      ukf_filter.x_(2) = gps_data->ins_vh.In_VXH;
+      ukf_filter.x_(3) = ego_pos[2];
+      ukf_filter.x_(4) = -gps_data->rateshorizontal.RZH * M_PI / 180.0;
+      ukf_filter.x_(0) = ukf_filter.x_(0) + ukf_filter.x_(2) * dt * cos(ukf_filter.x_(3));
+      ukf_filter.x_(1) = ukf_filter.x_(1) + ukf_filter.x_(2) * dt * sin(ukf_filter.x_(3));
     }
 
     if (measure_state == MeasureState::Laser)
@@ -261,8 +264,6 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &
       // state.x = ego_pos[0];
       // state.y = ego_pos[1];
       // state.v = can_data->ros_can_odometrie_msg.velocity_x;
-      state.v = gps_data->ins_vh.In_VXH;
-      state.yaw = ego_pos[2];
       // state.yawr = gps_data->rateshorizontal.RZH * M_PI / 180.0;
       // if (int(gps_data->status.Stat_Byte0_GPS_Mode) > 3)
       // {
@@ -272,10 +273,6 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &
       // else
       // {
 
-      state.x = new_state.x + state.v * dt * cos((state.yaw - 90 + 90));
-      state.y = new_state.y + state.v * dt * sin((state.yaw - 90 + 90));
-      ukf_filter.x_(0) = state.x;
-      ukf_filter.x_(1) = state.y;
       //   // state.x = new_state.x;
       //   // state.y = new_state.y;
       // }
@@ -316,6 +313,8 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const Marker::ConstPtr &
       cout << "nach x: " << new_state.x << " nach y: " << new_state.y << endl;
       meas_data.push_back(new_state.x);
       meas_data.push_back(new_state.y);
+      ukf_filter.x_(0) = new_state.x;
+      ukf_filter.x_(1) = new_state.y;
 
       cout << "vor x: " << state.x << " vor y: " << state.y << endl;
       cout << "nach x: " << new_state.x << " nach y: " << new_state.y << endl;
