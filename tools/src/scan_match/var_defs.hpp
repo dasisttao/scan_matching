@@ -67,5 +67,4 @@ public:
     std::vector<float> weights;
     std::vector<float> distances;
     std::vector<MyPoint> pts;
-    int size;
 };

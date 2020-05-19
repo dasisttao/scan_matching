@@ -6,7 +6,7 @@ MyPointCloud2D Filter::getScanPointsWithinThreshold(MyPointCloud2D scans)
 {
     MyPointCloud2D scans_filt;
     MyPoint temp_pt;
-    for (int i = 0; i < scans.size; i++)
+    for (int i = 0; i < scans.pts.size(); i++)
     {
         if (scans.pts[i].x < longi_max && scans.pts[i].x > longi_min)
         {
@@ -21,7 +21,6 @@ MyPointCloud2D Filter::getScanPointsWithinThreshold(MyPointCloud2D scans)
             }
         }
     }
-    scans_filt.size = scans_filt.ids.size();
     return scans_filt;
 }
 
@@ -38,7 +37,7 @@ Matrix2d Filter::allignScanPoints(MyPointCloud2D &scans, const State &state)
         << cos(alpha),
         sin(alpha),
         -sin(alpha), cos(alpha);
-    for (int i = 0; i < scans.size; i++)
+    for (int i = 0; i < scans.pts.size(); i++)
     {
         temp << scans.pts[i].x - 1.5, scans.pts[i].y + 0.45; // Scans verruscht.. -1.5 und +0.45 als Korrektur (FÜRS ERSTE!)
         result = rot_M * temp + ego_pos;
@@ -52,7 +51,7 @@ MyPointCloud2D Filter::reduceMap(MyPointCloud2D map_carpark, const State &state)
 {
     MyPointCloud2D map_filt;
     MyPoint temp_pt;
-    for (int i = 0; i < map_carpark.size; i++)
+    for (int i = 0; i < map_carpark.pts.size(); i++)
     {
         if (map_carpark.pts[i].x < state.x + map_threshold &&
             map_carpark.pts[i].x > state.x - map_threshold &&
@@ -67,6 +66,5 @@ MyPointCloud2D Filter::reduceMap(MyPointCloud2D map_carpark, const State &state)
             map_filt.weights.push_back(map_carpark.weights[i]);
         }
     }
-    map_filt.size = map_filt.ids.size();
     return map_filt;
 }

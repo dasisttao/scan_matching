@@ -287,7 +287,7 @@ void UKF::UpdateMeasurementLidar(const vector<double> &meas_datas)
   double temp_yaw = x_(3);
   double temp_yawr = x_(4);
   MatrixXd R(2, 2);
-  double std_laspx_2 = 0.7;
+  double std_laspx_2 = 0.05;
   R << std_laspx_2 * std_laspx_2, 0,
       0, std_laspx_2 * std_laspx_2;
   // std_v_ = 0.3;       //0.3
@@ -318,7 +318,7 @@ void UKF::UpdateMeasurementCAN2(const vector<double> &meas_datas)
 
   z << meas_datas[0],
       x_(3), // HIER MINUS! WIESO AUCH IMMER
-      meas_datas[1] * M_PI / 180.0;
+      meas_datas[1];
 
   MatrixXd H(3, 5);
   H << 0, 0, 1, 0, 0,
