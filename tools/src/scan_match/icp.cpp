@@ -185,6 +185,7 @@ State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT
         new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
     }
     new_state.yaw = -new_state.yaw;
+    new_state.yaw = atan2(sin(new_state.yaw), cos(new_state.yaw));
     new_state.yawr = state.yawr;
     new_state.data_flag = 1;
     return new_state;
@@ -273,7 +274,7 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
             float filt_distance = getFiltDistance(error[iterICP], 0.1 /*timestep => später variable*/);
             scans_kd = verwerfung(filt_distance, map_corrs, scans, map_carpark);
 
-            if (error[iterICP] > 5.5)
+            if (error[iterICP] > 3)
             {
                 new_state.data_flag = 0;
                 return scans_kd;

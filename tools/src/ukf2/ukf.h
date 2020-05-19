@@ -336,18 +336,22 @@ void UKF::UpdateMeasurementCAN2(const vector<double> &meas_datas)
       0, 0, std_radphip_ * std_radphip_;
 
   VectorXd y = z - H * x_;
+
   MatrixXd S = H * P_ * H.transpose() + R;
   MatrixXd K = P_ * H.transpose() * S.inverse();
   x_ = x_ + (K * y);
+  x_(3) = atan2(sin(x_(3)), cos(x_(3)));
+
   P_ = (MatrixXd::Identity(5, 5) - K * H) * P_;
 }
+
 void UKF::UpdateMeasurementCAN(const vector<double> &meas_datas)
 {
 
   VectorXd z(2);
 
   z << meas_datas[0],
-      meas_datas[1] * M_PI / 180.0;
+      meas_datas[1];
 
   MatrixXd H(2, 5);
   H << 0, 0, 1, 0, 0,
@@ -372,7 +376,8 @@ void UKF::UpdateMeasurementCAN(const vector<double> &meas_datas)
 
 void UKF::UpdateLidar(const vector<double> &meas_datas)
 {
-  int n_z = 2; // Number of Radar Measurements
+
+  int n_z = 3; // Number of Laser Measurements
   MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
   //transform sigma points into measurement space
   for (int i = 0; i < 2 * n_aug_ + 1; i++)
@@ -381,10 +386,12 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
     // extract values for better readibility
     double p_x = Xsig_pred_(0, i);
     double p_y = Xsig_pred_(1, i);
+    double yaw = Xsig_pred_(3, i);
 
     // measurement model
     Zsig(0, i) = p_x;
     Zsig(1, i) = p_y;
+    Zsig(2, i) = yaw;
   }
 
   //mean predicted measurement
@@ -402,13 +409,15 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
   { //2n+1 simga points
     //residual
     VectorXd z_diff = Zsig.col(i) - z_pred;
+    z_diff(2) = atan2(sin(z_diff(2)), cos(z_diff(2)));
     S = S + weights_(i) * z_diff * z_diff.transpose();
   }
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z, n_z);
-  R << std_laspx_ * std_laspx_, 0,
-      0, std_laspy_ * std_laspy_;
+  R << std_laspx_ * std_laspx_, 0, 0,
+      0, std_laspy_ * std_laspy_, 0,
+      0, 0, 0.05 * 0.05;
   S = S + R;
 
   //--------------------------------------UKF Update
@@ -426,6 +435,7 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
+    z_diff(2) = atan2(sin(z_diff(2)), cos(z_diff(2)));
     x_diff(3) = atan2(sin(x_diff(3)), cos(x_diff(3)));
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
@@ -436,12 +446,10 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
 
   //residual
   VectorXd z = VectorXd(n_z);
-  z << meas_datas[0], meas_datas[1];
+  z << meas_datas[0], meas_datas[1], meas_datas[2];
   VectorXd z_diff = z - z_pred;
-
-  //update state mean and covariance matrix
-  // x_(3) = atan2(sin(x_(3)), cos(x_(3)));
-  // x_(4) = atan2(sin(x_(4)), cos(x_(4)));
+  z_diff(2) = atan2(sin(z_diff(2)), cos(z_diff(2)));
+  // x_(3) = meas_datas[2]; // Hack, weil normalisieren nicht richtig funktioniert
   x_ = x_ + K * z_diff;
 
   P_ = P_ - K * S * K.transpose();
@@ -513,8 +521,6 @@ void UKF::UpdateCAN(const vector<double> &meas_datas)
   VectorXd z_diff = z - z_pred;
 
   //update state mean and covariance matrix
-  // x_(3) = atan2(sin(x_(3)), cos(x_(3)));
-  // x_(4) = atan2(sin(x_(4)), cos(x_(4)));
   x_ = x_ + K * z_diff;
 
   P_ = P_ - K * S * K.transpose();
