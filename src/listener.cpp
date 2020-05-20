@@ -122,9 +122,9 @@ void readMapLocal()
   while (in2.read_row(x, y))
   {
     map_carpark.ids.push_back(i);
-    rotatePoint(x, y, -73.7); //+ gegen Uhrzeiger
-    map_pt.x = x + 6.8;       // + obenrechts
-    map_pt.y = y - 0.9;       // -minus untenrechts
+    rotatePoint(x, y, -73.8); //+ gegen Uhrzeiger
+    map_pt.x = x + 9;         // + obenrechts
+    map_pt.y = y - 0.6;       // -minus untenrechts
     map_carpark.pts.push_back(map_pt);
     map_carpark.weights.push_back(1);
     map_carpark.distances.push_back(0);
@@ -142,7 +142,7 @@ sensor_msgs::PointCloud filterPC(sensor_msgs::PointCloud pc)
 
   for (int i = 0; i < pc.channels[0].values.size(); i++)
   {
-    if (!(pc.channels[0].values[i] == 0 || pc.channels[0].values[i] == 6 || pc.channels[0].values[i] == 4 || pc.channels[0].values[i] == 5 || pc.channels[0].values[i] == 7))
+    if (!(pc.channels[0].values[i] == 0)) //|| pc.channels[0].values[i] == 6 || pc.channels[0].values[i] == 4 || pc.channels[0].values[i] == 5 || pc.channels[0].values[i] == 7))
     {
       channel.values.push_back(pc.channels[0].values[i]);
       new_pc.points.push_back(pc.points[i]);
@@ -198,37 +198,34 @@ enum MeasureState
 {
   Odo,
   Laser,
-  Predict
+  GPS
 };
 MeasureState measure_state;
 
-void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr &gps_data)
+void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr &gps_data, const autobox_out::ConstPtr &can_data)
 {
 
   vector<double> ego_pos = setEgoPose(gps_data);
   double tnow = gps_data->header.stamp.toSec();
   double dt = tnow - ukf_filter.time_us_;
-  if (int(gps_data->status.Stat_Byte0_GPS_Mode) > 3)
+  if (!init)
   {
-    if (!init)
-    {
-      readMapUTM();
-      init = true;
-      measure_state = MeasureState::Odo;
-      ukf_filter.time_us_ = gps_data->header.stamp.toSec();
-      new_state.x = ego_pos[0];
-      new_state.y = ego_pos[1];
-      new_state.yaw = ego_pos[2];
-      ukf_filter.x_ << ego_pos[0], ego_pos[1], gps_data->ins_vh.In_VXH, ego_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
-      return;
-    }
-    else
-    {
-      ukf_filter.Prediction(dt);
-    }
-
+    // readMapUTM();
+    readMapLocal();
+    init = true;
+    measure_state = MeasureState::Odo;
+    ukf_filter.time_us_ = gps_data->header.stamp.toSec();
+    new_state.x = ego_pos[0];
+    new_state.y = ego_pos[1];
+    new_state.yaw = ego_pos[2];
+    ukf_filter.x_ << ego_pos[0], ego_pos[1], gps_data->ins_vh.In_VXH, ego_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
+    return;
+  }
+  if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 3)
+  {
     if (measure_state == MeasureState::Laser)
     {
+      ukf_filter.Prediction(dt);
       timer.start();
       //Setup current state
       state.x = ukf_filter.x_(0);
@@ -255,46 +252,76 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       my_map = rviz.createPointCloud(map_filt, "ibeo_lux");
       // //--4--ICP Algorithmen
       scans = icp.mainAlgorithm(map_filt, scans, state, new_state, rotM);
+      pc2 = rviz.createPointCloud(scans, "ibeo_lux");
       if (new_state.data_flag == 0)
       {
         double dt2 = timer.stop();
         tnow = tnow + dt2;
         ukf_filter.Prediction(dt2);
         vector<double> meas_data;
-        meas_data.push_back(gps_data->ins_vh.In_VXH);
-        meas_data.push_back(gps_data->rateshorizontal.RZH * M_PI / 180.0);
+        meas_data.push_back(can_data->ros_can_odometrie_msg.velocity_x);
+        meas_data.push_back(can_data->ros_imu_odometrie_msg.rate_horizontal_z * M_PI / 180.0);
         ukf_filter.UpdateMeasurementCAN2(meas_data);
       }
       else
       {
-        pc2 = rviz.createPointCloud(scans, "ibeo_lux");
+
         vector<double> meas_data;
         meas_data.push_back(new_state.x);
         meas_data.push_back(new_state.y);
         meas_data.push_back(new_state.yaw);
         ukf_filter.UpdateLidar(meas_data);
+        ukf_filter.x_(3) = atan2(sin(ukf_filter.x_(3)), cos(ukf_filter.x_(3)));
       }
 
       measure_state = MeasureState::Odo;
     }
-    else if (measure_state == MeasureState::Odo)
+    else if (measure_state == MeasureState::Odo || measure_state == MeasureState::GPS)
     {
+      ukf_filter.Prediction(dt);
       vector<double> meas_data;
-      meas_data.push_back(gps_data->ins_vh.In_VXH);
-      meas_data.push_back(gps_data->rateshorizontal.RZH * M_PI / 180.0);
-      ukf_filter.UpdateMeasurementCAN2(meas_data);
+      meas_data.push_back(can_data->ros_can_odometrie_msg.velocity_x);
+      meas_data.push_back(can_data->ros_imu_odometrie_msg.rate_horizontal_z * M_PI / 180.0);
+      ukf_filter.UpdateCAN(meas_data);
+
       measure_state = MeasureState::Laser;
     }
-
-    // Set Pose_est for rviz (debugging)
-    my_pose_est.pose.position.x = ukf_filter.x_(0);
-    my_pose_est.pose.position.y = ukf_filter.x_(1);
-    my_pose_est.pose.position.z = 1;
-    my_pose_est.pose.orientation.z = 0;
-    my_pose_est.pose.orientation.y = 1;
-    my_pose_est.pose.orientation.x = 0;
-    my_pose_est.pose.orientation.w = 1;
   }
+  else
+  {
+    if (measure_state == MeasureState::GPS)
+    {
+      ukf_filter.Prediction(dt);
+      vector<double> meas_data;
+      meas_data.push_back(ego_pos[0]);
+      meas_data.push_back(ego_pos[1]);
+      meas_data.push_back(gps_data->ins_vh.In_VXH);
+      meas_data.push_back(ego_pos[2]);
+      meas_data.push_back(can_data->ros_imu_odometrie_msg.rate_horizontal_z * M_PI / 180.0);
+      ukf_filter.UpdateGPS(meas_data);
+      measure_state = MeasureState::Odo;
+    }
+    else if (measure_state == MeasureState::Odo)
+    {
+      ukf_filter.Prediction(dt);
+      vector<double> meas_data;
+      meas_data.push_back(can_data->ros_can_odometrie_msg.velocity_x);
+      meas_data.push_back(can_data->ros_imu_odometrie_msg.rate_horizontal_z * M_PI / 180.0);
+      ukf_filter.UpdateCAN(meas_data);
+
+      measure_state = MeasureState::GPS;
+    }
+  }
+
+  // Set Pose_est for rviz (debugging)
+  my_pose_est.pose.position.x = ukf_filter.x_(0);
+  my_pose_est.pose.position.y = ukf_filter.x_(1);
+  my_pose_est.pose.position.z = 1;
+  my_pose_est.pose.orientation.z = 0;
+  my_pose_est.pose.orientation.y = 1;
+  my_pose_est.pose.orientation.x = 0;
+  my_pose_est.pose.orientation.w = 1;
+
   ukf_filter.time_us_ = tnow;
 }
 
@@ -307,10 +334,10 @@ int main(int argc, char **argv)
   message_filters::Subscriber<PointCloud2> point_cloud_sub(nh, "/as_tx/point_cloud", 10);
   // message_filters::Subscriber<PoseStamped> pose_sub(nh, "vehicle_pose", 10); // Später einführen!
   message_filters::Subscriber<gpsData> gps_sub(nh, "/can_2_ros_gps", 10);
-  // message_filters::Subscriber<autobox_out> can_sub(nh, "/data_out", 10);
-  typedef sync_policies::ApproximateTime<PointCloud2, gpsData> MySyncPolicy;
-  Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), point_cloud_sub, gps_sub);
-  sync.registerCallback(boost::bind(&callback, _1, _2));
+  message_filters::Subscriber<autobox_out> can_sub(nh, "/data_out", 10);
+  typedef sync_policies::ApproximateTime<PointCloud2, gpsData, autobox_out> MySyncPolicy;
+  Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), point_cloud_sub, gps_sub, can_sub);
+  sync.registerCallback(boost::bind(&callback, _1, _2, _3));
 
   auto pc_pub = nh.advertise<sensor_msgs::PointCloud2>("my_point_cloud", 30);
   auto map_pub = nh.advertise<sensor_msgs::PointCloud2>("my_map", 30);

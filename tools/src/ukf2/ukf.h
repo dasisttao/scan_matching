@@ -26,6 +26,7 @@ public:
   void UpdateMeasurementCAN(const vector<double> &meas_datas);
   void UpdateLidar(const vector<double> &meas_datas);
   void UpdateCAN(const vector<double> &meas_datas);
+  void UpdateGPS(const vector<double> &meas_datas);
   bool is_initialized_;
 
   // state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
@@ -327,8 +328,8 @@ void UKF::UpdateMeasurementCAN2(const vector<double> &meas_datas)
 
   MatrixXd R(3, 3);
 
-  std_v_ = 0.3;       //0.3
-  std_radphi_ = 0.03; //0.03
+  std_v_ = 0.2;       //0.3
+  std_radphi_ = 0.1;  //0.03
   std_radphip_ = 0.1; //0.1
 
   R << std_v_ * std_v_, 0, 0,
@@ -345,34 +346,46 @@ void UKF::UpdateMeasurementCAN2(const vector<double> &meas_datas)
   P_ = (MatrixXd::Identity(5, 5) - K * H) * P_;
 }
 
-void UKF::UpdateMeasurementCAN(const vector<double> &meas_datas)
-{
+// void UKF::UpdateMeasurementCAN(const vector<double> &meas_datas)
+// {
 
-  VectorXd z(2);
+//   VectorXd z(5);
 
-  z << meas_datas[0],
-      meas_datas[1];
+//   z << meas_datas[0],
+//       meas_datas[1],
+//       meas_datas[2],
+//       meas_datas[3],
+//       meas_datas[4];
 
-  MatrixXd H(2, 5);
-  H << 0, 0, 1, 0, 0,
-      0, 0, 0, 0, 1;
+//   MatrixXd H(5, 5);
+//   H << 1, 0, 0, 0, 0,
+//       0, 1, 0, 0, 0,
+//       0, 0, 1, 0, 0,
+//       0, 0, 0, 1, 1,
+//       0, 0, 0, 0, 1;
 
-  MatrixXd R(2, 2);
+//   MatrixXd R(5, 5);
 
-  std_v_ = 0.01;      //0.3
-  std_radphi_ = 0.03; //0.03
-  std_radphip_ = 0.1; //0.1
+//   std_v_ = 0.3;       //0.3
+//   std_radphi_ = 0.03; //0.03
+//   std_radphip_ = 0.1; //0.1
 
-  R << std_v_ * std_v_, 0,
-      0, std_radphip_ * std_radphip_;
+//   R << std_px_ * std_px_, 0, 0, 0, 0,
+//       0, std_px_ * std_px_, 0, 0, 0,
+//       0, 0, std_v_ * std_v_, 0, 0,
+//       0, 0, 0, std_radphi_ * std_radphi_, 0,
+//       0, 0, 0, 0, std_radphip_ * std_radphip_;
 
-  VectorXd y = z - H * x_;
-  MatrixXd S = H * P_ * H.transpose() + R;
-  MatrixXd K = P_ * H.transpose() * S.inverse();
-  x_ = x_ + (K * y);
+//   VectorXd y = z - H * x_;
+//   y(3) = atan2(sin(y(3)), cos(y(3)));
+//   MatrixXd S = H * P_ * H.transpose() + R;
+//   MatrixXd K = P_ * H.transpose() * S.inverse();
+//   x_(3) = atan2(sin(x_(3)), cos(x_(3)));
+//   x_ = x_ + (K * y);
+//   x_(3) = atan2(sin(x_(3)), cos(x_(3)));
 
-  P_ = (MatrixXd::Identity(5, 5) - K * H) * P_;
-}
+//   P_ = (MatrixXd::Identity(5, 5) - K * H) * P_;
+// }
 
 void UKF::UpdateLidar(const vector<double> &meas_datas)
 {
@@ -415,9 +428,11 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z, n_z);
-  R << std_laspx_ * std_laspx_, 0, 0,
-      0, std_laspy_ * std_laspy_, 0,
-      0, 0, 0.05 * 0.05;
+  double yawd = 0.07;
+  double factor = 20;
+  R << std_laspx_ * std_laspx_ * factor, 0, 0,
+      0, std_laspy_ * std_laspy_ * factor, 0,
+      0, 0, yawd * yawd;
   S = S + R;
 
   //--------------------------------------UKF Update
@@ -457,7 +472,7 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
 
 void UKF::UpdateCAN(const vector<double> &meas_datas)
 {
-  int n_z = 2; // Number of Radar Measurements
+  int n_z = 2; //
   MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
   //transform sigma points into measurement space
   for (int i = 0; i < 2 * n_aug_ + 1; i++)
@@ -488,8 +503,8 @@ void UKF::UpdateCAN(const vector<double> &meas_datas)
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z, n_z);
-  R << std_laspx_ * std_laspx_, 0,
-      0, std_laspy_ * std_laspy_;
+  R << 0.3 * 0.3, 0,
+      0, 0.0001 * 0.0001;
   S = S + R;
 
   //--------------------------------------UKF Update
@@ -522,6 +537,83 @@ void UKF::UpdateCAN(const vector<double> &meas_datas)
 
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
+  x_(3) = atan2(sin(x_(3)), cos(x_(3)));
+  P_ = P_ - K * S * K.transpose();
+}
+void UKF::UpdateGPS(const vector<double> &meas_datas)
+{
+  int n_z = 5; //
+  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
+  //transform sigma points into measurement space
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
 
+    // measurement model
+    Zsig(0, i) = Xsig_pred_(0, i); //speed
+    Zsig(1, i) = Xsig_pred_(1, i); //speed
+    Zsig(2, i) = Xsig_pred_(2, i); //speed
+    Zsig(3, i) = Xsig_pred_(3, i); //yaw
+    Zsig(4, i) = Xsig_pred_(4, i); //yaw_rate
+  }
+
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
+  z_pred.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  {
+    z_pred = z_pred + weights_(i) * Zsig.col(i);
+  }
+
+  //innovation covariance matrix S
+  MatrixXd S = MatrixXd(n_z, n_z);
+  S.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    S = S + weights_(i) * z_diff * z_diff.transpose();
+  }
+
+  //add measurement noise covariance matrix
+  MatrixXd R = MatrixXd(n_z, n_z);
+  R << 0.15 * 0.15, 0, 0, 0, 0,
+      0, 0.15 * 0.15, 0, 0, 0,
+      0, 0, 0.3 * 0.3, 0, 0,
+      0, 0, 0, 0.03 * 0.03, 0,
+      0, 0, 0, 0, 0.3 * 0.3;
+  S = S + R;
+
+  //--------------------------------------UKF Update
+  VectorXd x_out = VectorXd(5);
+  MatrixXd P_out = MatrixXd(5, 5);
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+
+  //calculate cross correlation matrix
+  Tc.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    // state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    //angle normalization
+    x_diff(3) = atan2(sin(x_diff(3)), cos(x_diff(3)));
+    z_diff(3) = atan2(sin(z_diff(3)), cos(z_diff(3)));
+    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
+  }
+
+  //Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+
+  //residual
+  VectorXd z = VectorXd(n_z);
+  z << meas_datas[0], meas_datas[1], meas_datas[2], meas_datas[3], meas_datas[4];
+  VectorXd z_diff = z - z_pred;
+  z_diff(3) = atan2(sin(z_diff(3)), cos(z_diff(3)));
+
+  //update state mean and covariance matrix
+  x_ = x_ + K * z_diff;
+  x_(3) = atan2(sin(x_(3)), cos(x_(3)));
   P_ = P_ - K * S * K.transpose();
 }

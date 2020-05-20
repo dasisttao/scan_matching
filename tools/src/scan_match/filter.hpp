@@ -17,9 +17,9 @@ public:
     MyPointCloud2D reduceMap(MyPointCloud2D map_carpark, const State &state);
 
 private:
-    const float longi_max = 40;
-    const float longi_min = -40;
-    const float lateral_max = 35;
-    const float lateral_min = -35;
-    const float map_threshold = 40;
+    const float longi_max = 75;
+    const float longi_min = -75;
+    const float lateral_max = 75;
+    const float lateral_min = -75;
+    const float map_threshold = 75;
 };

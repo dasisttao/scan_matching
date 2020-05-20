@@ -24,7 +24,7 @@ sensor_msgs::PointCloud2 RVIZ::createPointCloud(MyPointCloud2D my_pc, string fra
     {
         pc.points[i].x = my_pc.pts[i].x;
         pc.points[i].y = my_pc.pts[i].y;
-        pc.points[i].z = 1;
+        pc.points[i].z = 1.1;
         depth_channel.values.push_back(1);
     }
     pc.channels.push_back(depth_channel);

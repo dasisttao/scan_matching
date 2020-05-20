@@ -62,7 +62,7 @@ MyPointCloud2D ICP::verwerfung(float filt_distance, MyPointCloud2D &map_corrs, c
     //Removing correspondencies that are too far apart
     for (size_t i = 0; i < scans.distances.size(); i++)
     {
-        if (scans.distances[i] < filt_distance)
+        if (scans.distances[i] < filt_distance * 0.66)
         {
             temp_scans.distances.push_back(scans.distances[i]);
             temp_scans.ids.push_back(i);
@@ -179,9 +179,11 @@ State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT
     if (abs(state.yaw + acos(TR[number_of_iterations](0, 0))) < M_PI)
     {
         new_state.yaw = acos(new_rot(0, 0));
+        // new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
     }
     else
     {
+        // new_state.yaw = acos(new_rot(0, 0));
         new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
     }
     new_state.yaw = -new_state.yaw;
@@ -273,8 +275,8 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
             error[iterICP] = sqrt(distance_total_sqr / map_corrs.pts.size());
             float filt_distance = getFiltDistance(error[iterICP], 0.1 /*timestep => später variable*/);
             scans_kd = verwerfung(filt_distance, map_corrs, scans, map_carpark);
-
-            if (error[iterICP] > 3)
+            // cout << error[iterICP] << endl;
+            if (error[iterICP] > 300)
             {
                 new_state.data_flag = 0;
                 return scans_kd;
