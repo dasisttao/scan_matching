@@ -428,10 +428,10 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z, n_z);
-  double yawd = 0.07;
-  double factor = 20;
-  R << std_laspx_ * std_laspx_ * factor, 0, 0,
-      0, std_laspy_ * std_laspy_ * factor, 0,
+  double yawd = 0.03;
+  double stdxy = 0.06;
+  R << stdxy * stdxy, 0, 0,
+      0, stdxy * stdxy, 0,
       0, 0, yawd * yawd;
   S = S + R;
 
@@ -503,8 +503,10 @@ void UKF::UpdateCAN(const vector<double> &meas_datas)
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z, n_z);
-  R << 0.3 * 0.3, 0,
-      0, 0.0001 * 0.0001;
+  double dyawr = 0.001;
+  double dv = 0.05;
+  R << dv * dv, 0,
+      0, dyawr * dyawr;
   S = S + R;
 
   //--------------------------------------UKF Update

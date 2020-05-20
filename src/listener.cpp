@@ -52,7 +52,7 @@ ros::Publisher my_true_path;
 ros::Publisher my_est_path;
 nav_msgs::Path my_est_path_msg, my_true_path_msg;
 UKF ukf_filter;
-
+vector<Particle> my_particles;
 MyPointCloud2D createScanPoints(sensor_msgs::PointCloud msg)
 {
   MyPointCloud2D scan_points;
@@ -94,7 +94,7 @@ void readMapUTM() //-1440, -4200
     map_carpark.distances.push_back(0);
     i++;
   }
-  my_map = rviz.createPointCloud(map_carpark, "ibeo_lux");
+  my_map = rviz.createPointCloud(map_carpark, "ibeo_lux", 1);
 }
 
 void rotatePoint(double &x, double &y, double alpha)
@@ -122,15 +122,16 @@ void readMapLocal()
   while (in2.read_row(x, y))
   {
     map_carpark.ids.push_back(i);
-    rotatePoint(x, y, -73.8); //+ gegen Uhrzeiger
-    map_pt.x = x + 9;         // + obenrechts
+
+    rotatePoint(x, y, -72.6); //+ gegen Uhrzeiger
+    map_pt.x = x + 8;         // + obenrechts
     map_pt.y = y - 0.6;       // -minus untenrechts
     map_carpark.pts.push_back(map_pt);
     map_carpark.weights.push_back(1);
     map_carpark.distances.push_back(0);
     i++;
   }
-  my_map = rviz.createPointCloud(map_carpark, "ibeo_lux");
+  my_map = rviz.createPointCloud(map_carpark, "ibeo_lux", 1.0);
 }
 
 sensor_msgs::PointCloud filterPC(sensor_msgs::PointCloud pc)
@@ -202,6 +203,19 @@ enum MeasureState
 };
 MeasureState measure_state;
 
+void createParticles(vector<Particle> &particles, const State &state, MyPointCloud2D scans)
+{
+  particles.clear();
+  double offset = 0.6;
+
+  Particle particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, 0, scans);
+  particles.push_back(particle);
+  particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, offset * 1.5, scans));
+  particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, -offset * 1.5, scans));
+  particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, offset, scans));
+  particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, -offset, scans));
+}
+bool init_allign = false;
 void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr &gps_data, const autobox_out::ConstPtr &can_data)
 {
 
@@ -221,7 +235,8 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     ukf_filter.x_ << ego_pos[0], ego_pos[1], gps_data->ins_vh.In_VXH, ego_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
     return;
   }
-  if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 3)
+
+  if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 2)
   {
     if (measure_state == MeasureState::Laser)
     {
@@ -243,16 +258,59 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       //Create ScanPoints vector for better handling
       MyPointCloud2D scans = createScanPoints(pc);
       //------Algorithm
+      Particle best_particle;
+      MyPointCloud2D map_filt;
+      if (!init_allign)
+      {
+        //--1--Reducing ScanPoints
+        filter.lateral_max = 8;
+        filter.longi_min = -8;
+        filter.longi_max = 8;
+        filter.lateral_min = -8;
+        filter.map_threshold = 8;
+        //--1--Reducing ScanPoints
+        scans = filter.getScanPointsWithinThreshold(scans);
+        //--2a--Create particles
+        createParticles(my_particles, state, scans);
+        //--2b--Pre-Allignment (Vorausrichtung)
+        Matrix2d rotM = filter.allignScanPoints(scans, state);
+        //--2c--Pre-Allign Particles
+        filter.allignParticles(my_particles);
+        //--3--Reduce points in map
+        map_filt = filter.reduceMap(map_carpark, state);
+        // my_map = rviz.createPointCloud(map_filt, "ibeo_lux", 1.0);
+        // //--4--ICP Algorithmen
+        best_particle = icp.particleFilter(map_filt, my_particles);
+        ukf_filter.x_(0) = best_particle.state.x;
+        ukf_filter.x_(1) = best_particle.state.y;
+        ukf_filter.time_us_ = tnow;
+        init_allign = true;
+        filter.lateral_max = 75;
+        filter.longi_min = -75;
+        filter.longi_max = 75;
+        filter.lateral_min = -75;
+        filter.map_threshold = 75;
+
+        return;
+      }
+
       //--1--Reducing ScanPoints
       scans = filter.getScanPointsWithinThreshold(scans);
-      //--2--Pre-Allignment (Vorausrichtung)
+      //--2a--Create particles
+      createParticles(my_particles, state, scans);
+      //--2b--Pre-Allignment (Vorausrichtung)
       Matrix2d rotM = filter.allignScanPoints(scans, state);
+      //--2c--Pre-Allign Particles
+      filter.allignParticles(my_particles);
       //--3--Reduce points in map
-      MyPointCloud2D map_filt = filter.reduceMap(map_carpark, state);
-      my_map = rviz.createPointCloud(map_filt, "ibeo_lux");
+      map_filt = filter.reduceMap(map_carpark, state);
+      my_map = rviz.createPointCloud(map_filt, "ibeo_lux", 1.0);
       // //--4--ICP Algorithmen
-      scans = icp.mainAlgorithm(map_filt, scans, state, new_state, rotM);
-      pc2 = rviz.createPointCloud(scans, "ibeo_lux");
+      best_particle = my_particles[0];
+
+      scans = icp.mainAlgorithm(map_filt, best_particle.pc, best_particle.state, new_state, best_particle.rotM);
+      // scans = icp.mainAlgorithm(map_filt, scans, state, new_state, rotM);
+      pc2 = rviz.createPointCloud(scans, "ibeo_lux", 1.1);
       if (new_state.data_flag == 0)
       {
         double dt2 = timer.stop();

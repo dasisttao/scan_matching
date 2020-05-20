@@ -13,11 +13,13 @@
 #include <eigen3/Eigen/Dense>
 #include <kdtree/nanoflann.hpp>
 #include <chrono>
+#include <ukf_state_msg/State.h>
 #define PI 3.14159265
 
 using namespace std;
 using namespace Eigen;
 using namespace nanoflann;
+using namespace ukf_state_msg;
 template <typename T>
 struct PointCloud2D
 {
@@ -67,4 +69,37 @@ public:
     std::vector<float> weights;
     std::vector<float> distances;
     std::vector<MyPoint> pts;
+};
+
+class Particle
+{
+public:
+    Particle() = default;
+    Particle(double x, double y, double v, double yaw, double yawr, double dx, double dy, MyPointCloud2D pc)
+    {
+        double alpha = (-yaw);
+        Vector2d new_pos;
+        Vector2d old_pos;
+        Vector2d offset;
+        old_pos << x, y;
+        offset << dx, dy;
+        this->rotM
+            << cos(alpha),
+            sin(alpha),
+            -sin(alpha), cos(alpha);
+
+        new_pos = rotM * offset + old_pos;
+        this->state.x = new_pos(0);
+        this->state.y = new_pos(1);
+        this->state.v = v;
+        this->state.yaw = yaw;
+        this->state.yawr = yawr;
+        this->pc = pc;
+    }
+
+public:
+    State state;
+    float error;
+    Matrix2d rotM;
+    MyPointCloud2D pc;
 };

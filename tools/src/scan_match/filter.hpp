@@ -14,12 +14,14 @@ public:
     Filter() = default;
     MyPointCloud2D getScanPointsWithinThreshold(MyPointCloud2D scans);
     Matrix2d allignScanPoints(MyPointCloud2D &scans, const State &state);
+    void allignParticles(vector<Particle> &particles);
     MyPointCloud2D reduceMap(MyPointCloud2D map_carpark, const State &state);
+    void createParticles(vector<Particle> &particles, const State &state);
 
-private:
-    const float longi_max = 75;
-    const float longi_min = -75;
-    const float lateral_max = 75;
-    const float lateral_min = -75;
-    const float map_threshold = 75;
+public:
+    float longi_max = 75;
+    float longi_min = -75;
+    float lateral_max = 75;
+    float lateral_min = -75;
+    float map_threshold = 75;
 };

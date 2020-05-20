@@ -14,14 +14,15 @@ public:
     void calcEqPoints(MyPointCloud2D map_corrs, MyPointCloud2D scans, Matrix2d &R, Vector2d &T);
     MyPointCloud2D verwerfung(float filt_distance, MyPointCloud2D &map_corrs, const MyPointCloud2D &scans, const MyPointCloud2D &map_carpark);
     float getFiltDistance(float error_before_matching, float ratio_corres_last_timestep);
-    void createPointCloud2D(PointCloud2D<float> &cloudMap, PointCloud2D<float> &cloudScan, const MyPointCloud2D &map_carpark, const MyPointCloud2D &scans);
+    void createPointCloud2D(PointCloud2D<float> &pc, const MyPointCloud2D &my_pc);
     MyPointCloud2D findNeigherstNeighbor(const PointCloud2D<float> &map_carpark, const PointCloud2D<float> &scans, MyPointCloud2D &my_scans, float &distance_total_corrs_sqr, const my_kd_tree_t &index);
     State matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT, State state, Matrix2d &rotM);
     void calcWeights(MyPointCloud2D &scans);
     MyPointCloud2D mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointCloud2D &scans, State state, State &new_state, Matrix2d &rotM);
+    Particle particleFilter(const MyPointCloud2D &map_carpark, vector<Particle> &my_particles);
 
 private:
-    const size_t number_of_iterations = 4;
+    const size_t number_of_iterations = 5;
     const size_t number_of_results = 1;
 
 private:

@@ -62,7 +62,7 @@ MyPointCloud2D ICP::verwerfung(float filt_distance, MyPointCloud2D &map_corrs, c
     //Removing correspondencies that are too far apart
     for (size_t i = 0; i < scans.distances.size(); i++)
     {
-        if (scans.distances[i] < filt_distance * 0.66)
+        if (scans.distances[i] < filt_distance)
         {
             temp_scans.distances.push_back(scans.distances[i]);
             temp_scans.ids.push_back(i);
@@ -116,23 +116,18 @@ float ICP::getFiltDistance(float error_before_matching, float ratio_corres_last_
     filt_distance = error_before_matching + 0.2;
     return filt_distance;
 }
-void ICP::createPointCloud2D(PointCloud2D<float> &cloudMap, PointCloud2D<float> &cloudScan, const MyPointCloud2D &map_carpark, const MyPointCloud2D &scans)
+void ICP::createPointCloud2D(PointCloud2D<float> &pc, const MyPointCloud2D &my_pc)
 {
-    cloudMap.pts.clear();
-    cloudScan.pts.clear();
-    cloudMap.pts.resize(map_carpark.pts.size());
-    cloudScan.pts.resize(scans.pts.size());
-    for (int i = 0; i < map_carpark.pts.size(); i++)
+    pc.pts.clear();
+    pc.pts.resize(my_pc.pts.size());
+
+    for (int i = 0; i < my_pc.pts.size(); i++)
     {
-        cloudMap.pts[i].x = map_carpark.pts[i].x;
-        cloudMap.pts[i].y = map_carpark.pts[i].y;
-    }
-    for (int i = 0; i < scans.pts.size(); i++)
-    {
-        cloudScan.pts[i].x = scans.pts[i].x;
-        cloudScan.pts[i].y = scans.pts[i].y;
+        pc.pts[i].x = my_pc.pts[i].x;
+        pc.pts[i].y = my_pc.pts[i].y;
     }
 }
+
 MyPointCloud2D ICP::findNeigherstNeighbor(const PointCloud2D<float> &cloudMap, const PointCloud2D<float> &cloudScan, MyPointCloud2D &scans, float &distance_total_corrs, const my_kd_tree_t &index)
 {
     MyPointCloud2D map_corrs;
@@ -179,11 +174,9 @@ State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT
     if (abs(state.yaw + acos(TR[number_of_iterations](0, 0))) < M_PI)
     {
         new_state.yaw = acos(new_rot(0, 0));
-        // new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
     }
     else
     {
-        // new_state.yaw = acos(new_rot(0, 0));
         new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
     }
     new_state.yaw = -new_state.yaw;
@@ -241,11 +234,43 @@ void transformLast(Matrix2d TR, Vector2d TT, MyPointCloud2D &scans_kd)
         scans_kd.pts[i].y = TR(1, 0) * scans_kd.pts[i].x + TR(1, 1) * scans_kd.pts[i].y + TT(1);
     }
 }
+Particle ICP::particleFilter(const MyPointCloud2D &map_carpark, vector<Particle> &my_particles)
+{
+    vector<float> particle_errors;
+    PointCloud2D<float> cloudMap;
+
+    // kd-Baum erstellen
+    createPointCloud2D(cloudMap, map_carpark);
+    my_kd_tree_t index(2 /*dim*/, cloudMap, nanoflann::KDTreeSingleIndexAdaptorParams(10 /*max leaf*/));
+    index.buildIndex();
+    for (int p = 0; p < my_particles.size(); p++)
+    {
+        //Create PointCloud
+        PointCloud2D<float> cloudScan;
+        MyPointCloud2D map_corrs;
+        createPointCloud2D(cloudScan, my_particles[p].pc);
+        float distance_total_sqr = 0;
+        map_corrs = findNeigherstNeighbor(cloudMap, cloudScan, my_particles[p].pc, distance_total_sqr, index);
+        float error_test = sqrt(distance_total_sqr / map_corrs.pts.size());
+        // MyPointCloud2D scans_kd = verwerfung(1, map_corrs, my_particles[p].pc, map_carpark);
+        // for (float distance : scans_kd.distances)
+        // {
+        //     distance_total_sqr += distance;
+        // }
+        particle_errors.push_back(distance_total_sqr / map_corrs.pts.size());
+        cout << "Error particle Nr." << p << " :" << error_test << endl;
+    }
+    cout << "______________" << endl;
+    int minErrorParticleIndex = std::min_element(particle_errors.begin(), particle_errors.end()) - particle_errors.begin();
+    return my_particles[minErrorParticleIndex];
+}
+
 MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointCloud2D &scans, State state, State &new_state, Matrix2d &rotM)
 {
     //---Init---
     PointCloud2D<float> cloudMap, cloudScan;
-    createPointCloud2D(cloudMap, cloudScan, map_carpark, scans);
+    createPointCloud2D(cloudMap, map_carpark);
+    createPointCloud2D(cloudScan, scans);
     // kd-Baum Init
     my_kd_tree_t index(2 /*dim*/, cloudMap, nanoflann::KDTreeSingleIndexAdaptorParams(10 /*max leaf*/));
     // kd-Baum erstellen
@@ -281,16 +306,17 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
                 new_state.data_flag = 0;
                 return scans_kd;
             }
-            createPointCloud2D(cloudMap, cloudScan, map_corrs, scans_kd);
+            createPointCloud2D(cloudScan, scans_kd);
         }
         else
         {
             // Im Matlab Code , aber unnötig?
             map_corrs = findNeigherstNeighbor(cloudMap, cloudScan, scans_kd, distance_total_sqr, index);
             error[iterICP] = sqrt(distance_total_sqr / map_corrs.pts.size());
+
             float filt_distance = getFiltDistance(error[iterICP], 0.1 /*timestep => später variable*/);
             scans_kd = verwerfung(filt_distance, map_corrs, scans, map_carpark);
-            createPointCloud2D(cloudMap, cloudScan, map_corrs, scans_kd);
+            createPointCloud2D(cloudScan, scans_kd);
         }
 
         //---Calculate Weights
