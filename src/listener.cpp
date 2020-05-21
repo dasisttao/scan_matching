@@ -143,7 +143,7 @@ sensor_msgs::PointCloud filterPC(sensor_msgs::PointCloud pc)
 
   for (int i = 0; i < pc.channels[0].values.size(); i++)
   {
-    if (!(pc.channels[0].values[i] == 0)) //|| pc.channels[0].values[i] == 6 || pc.channels[0].values[i] == 4 || pc.channels[0].values[i] == 5 || pc.channels[0].values[i] == 7))
+    if (!(pc.channels[0].values[i] == 0) || pc.channels[0].values[i] == 6 || pc.channels[0].values[i] == 4 || pc.channels[0].values[i] == 5 || pc.channels[0].values[i] == 7)
     {
       channel.values.push_back(pc.channels[0].values[i]);
       new_pc.points.push_back(pc.points[i]);
@@ -210,10 +210,24 @@ void createParticles(vector<Particle> &particles, const State &state, MyPointClo
 
   Particle particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, 0, scans);
   particles.push_back(particle);
-  particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, offset * 1.5, scans));
-  particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, -offset * 1.5, scans));
-  particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, offset, scans));
-  particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, -offset, scans));
+  // particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, offset * 1.5, scans));
+  // particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, -offset * 1.5, scans));
+  // particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, offset, scans));
+  // particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, -offset, scans));
+}
+
+double yawr1 = 0;
+double yawr2 = 0;
+void dynamikAdjustUKF(double yawr1, double yawr2)
+{
+  cout << "yawr1: " << yawr1 << endl;
+  cout << "yawr2: " << yawr2 << endl;
+  cout << "dyawr: " << abs(yawr2 - yawr1) << endl;
+  // std_laspx_ = 0.04;
+  // std_laspy_ = std_laspx_;
+  // std_lasyaw_ = 0.025;
+  // std_odo_yawr = 0.01;
+  // std_odo_v = 0.05;
 }
 bool init_allign = false;
 void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr &gps_data, const autobox_out::ConstPtr &can_data)
@@ -232,10 +246,11 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     new_state.x = ego_pos[0];
     new_state.y = ego_pos[1];
     new_state.yaw = ego_pos[2];
+
     ukf_filter.x_ << ego_pos[0], ego_pos[1], gps_data->ins_vh.In_VXH, ego_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
     return;
   }
-
+  yawr1 = ukf_filter.x_(4);
   if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 2)
   {
     if (measure_state == MeasureState::Laser)
@@ -318,7 +333,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
         ukf_filter.Prediction(dt2);
         vector<double> meas_data;
         meas_data.push_back(can_data->ros_can_odometrie_msg.velocity_x);
-        meas_data.push_back(can_data->ros_imu_odometrie_msg.rate_horizontal_z * M_PI / 180.0);
+        meas_data.push_back(-(can_data->ros_can_odometrie_msg.yaw_rate * M_PI / 180.0));
         ukf_filter.UpdateMeasurementCAN2(meas_data);
       }
       else
@@ -339,7 +354,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       ukf_filter.Prediction(dt);
       vector<double> meas_data;
       meas_data.push_back(can_data->ros_can_odometrie_msg.velocity_x);
-      meas_data.push_back(can_data->ros_imu_odometrie_msg.rate_horizontal_z * M_PI / 180.0);
+      meas_data.push_back(-(can_data->ros_can_odometrie_msg.yaw_rate * M_PI / 180.0));
       ukf_filter.UpdateCAN(meas_data);
 
       measure_state = MeasureState::Laser;
@@ -355,16 +370,16 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       meas_data.push_back(ego_pos[1]);
       meas_data.push_back(gps_data->ins_vh.In_VXH);
       meas_data.push_back(ego_pos[2]);
-      meas_data.push_back(can_data->ros_imu_odometrie_msg.rate_horizontal_z * M_PI / 180.0);
+      meas_data.push_back(-(can_data->ros_can_odometrie_msg.yaw_rate * M_PI / 180.0));
       ukf_filter.UpdateGPS(meas_data);
-      measure_state = MeasureState::Odo;
+      measure_state = MeasureState::GPS;
     }
     else if (measure_state == MeasureState::Odo)
     {
       ukf_filter.Prediction(dt);
       vector<double> meas_data;
       meas_data.push_back(can_data->ros_can_odometrie_msg.velocity_x);
-      meas_data.push_back(can_data->ros_imu_odometrie_msg.rate_horizontal_z * M_PI / 180.0);
+      meas_data.push_back(-(can_data->ros_can_odometrie_msg.yaw_rate * M_PI / 180.0));
       ukf_filter.UpdateCAN(meas_data);
 
       measure_state = MeasureState::GPS;
@@ -379,7 +394,8 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
   my_pose_est.pose.orientation.y = 1;
   my_pose_est.pose.orientation.x = 0;
   my_pose_est.pose.orientation.w = 1;
-
+  yawr2 = ukf_filter.x_(4);
+  dynamikAdjustUKF(yawr1, yawr2);
   ukf_filter.time_us_ = tnow;
 }
 

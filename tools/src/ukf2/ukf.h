@@ -52,6 +52,11 @@ public:
   // Laser measurement noise standard deviation position2 in m
   double std_laspy_;
 
+  double std_lasyaw_;
+
+  double std_odo_yawr;
+  double std_odo_v;
+
   // measurement noise standard deviation position1 in m
   double std_px_;
   // measurement noise standard deviation position2 in m
@@ -106,8 +111,12 @@ UKF::UKF()
   std_radphip_ = 0.6; //0.3
 
   //Laser
-  std_laspx_ = 0.15;
-  std_laspy_ = 0.15;
+  std_laspx_ = 0.04;
+  std_laspy_ = std_laspx_;
+  std_lasyaw_ = 0.02;
+  //Odot
+  std_odo_yawr = 0.0001;
+  std_odo_v = 0.05;
 
   time_us_ = 0;
 
@@ -428,11 +437,10 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z, n_z);
-  double yawd = 0.03;
-  double stdxy = 0.06;
-  R << stdxy * stdxy, 0, 0,
-      0, stdxy * stdxy, 0,
-      0, 0, yawd * yawd;
+
+  R << std_laspx_ * std_laspx_, 0, 0,
+      0, std_laspy_ * std_laspy_, 0,
+      0, 0, std_lasyaw_ * std_lasyaw_;
   S = S + R;
 
   //--------------------------------------UKF Update
@@ -503,10 +511,10 @@ void UKF::UpdateCAN(const vector<double> &meas_datas)
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z, n_z);
-  double dyawr = 0.001;
-  double dv = 0.05;
-  R << dv * dv, 0,
-      0, dyawr * dyawr;
+  // double dyawr = 0.01;
+  // double dv = 0.01;
+  R << std_odo_v * std_odo_v, 0,
+      0, std_odo_yawr * std_odo_yawr;
   S = S + R;
 
   //--------------------------------------UKF Update
