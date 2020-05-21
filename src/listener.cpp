@@ -216,13 +216,11 @@ void createParticles(vector<Particle> &particles, const State &state, MyPointClo
   // particles.push_back(Particle(state.x, state.y, state.v, state.yaw, state.yawr, 0, -offset, scans));
 }
 
-double yawr1 = 0;
-double yawr2 = 0;
-void dynamikAdjustUKF(double yawr1, double yawr2)
+void dynamikAdjustUKF(double yawr)
 {
-  cout << "yawr1: " << yawr1 << endl;
-  cout << "yawr2: " << yawr2 << endl;
-  cout << "dyawr: " << abs(yawr2 - yawr1) << endl;
+  // cout << yawr << endl;
+  // double test = 0.3 * abs(yawr) + 5.01;
+  // ukf_filter.UpdateLiderParamter(test);
   // std_laspx_ = 0.04;
   // std_laspy_ = std_laspx_;
   // std_lasyaw_ = 0.025;
@@ -250,7 +248,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     ukf_filter.x_ << ego_pos[0], ego_pos[1], gps_data->ins_vh.In_VXH, ego_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
     return;
   }
-  yawr1 = ukf_filter.x_(4);
+  dynamikAdjustUKF(ukf_filter.x_(4));
   if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 2)
   {
     if (measure_state == MeasureState::Laser)
@@ -394,8 +392,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
   my_pose_est.pose.orientation.y = 1;
   my_pose_est.pose.orientation.x = 0;
   my_pose_est.pose.orientation.w = 1;
-  yawr2 = ukf_filter.x_(4);
-  dynamikAdjustUKF(yawr1, yawr2);
+
   ukf_filter.time_us_ = tnow;
 }
 

@@ -27,6 +27,7 @@ public:
   void UpdateLidar(const vector<double> &meas_datas);
   void UpdateCAN(const vector<double> &meas_datas);
   void UpdateGPS(const vector<double> &meas_datas);
+  void UpdateLiderParamter(double dyawr);
   bool is_initialized_;
 
   // state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
@@ -111,9 +112,9 @@ UKF::UKF()
   std_radphip_ = 0.6; //0.3
 
   //Laser
-  std_laspx_ = 0.04;
+  std_laspx_ = 0.02;
   std_laspy_ = std_laspx_;
-  std_lasyaw_ = 0.02;
+  std_lasyaw_ = 0.001;
   //Odot
   std_odo_yawr = 0.0001;
   std_odo_v = 0.05;
@@ -395,6 +396,10 @@ void UKF::UpdateMeasurementCAN2(const vector<double> &meas_datas)
 
 //   P_ = (MatrixXd::Identity(5, 5) - K * H) * P_;
 // }
+void UKF::UpdateLiderParamter(double dyawr)
+{
+  std_lasyaw_ = dyawr;
+}
 
 void UKF::UpdateLidar(const vector<double> &meas_datas)
 {
@@ -437,7 +442,7 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z, n_z);
-
+  cout << std_lasyaw_ << endl;
   R << std_laspx_ * std_laspx_, 0, 0,
       0, std_laspy_ * std_laspy_, 0,
       0, 0, std_lasyaw_ * std_lasyaw_;
@@ -513,6 +518,7 @@ void UKF::UpdateCAN(const vector<double> &meas_datas)
   MatrixXd R = MatrixXd(n_z, n_z);
   // double dyawr = 0.01;
   // double dv = 0.01;
+
   R << std_odo_v * std_odo_v, 0,
       0, std_odo_yawr * std_odo_yawr;
   S = S + R;

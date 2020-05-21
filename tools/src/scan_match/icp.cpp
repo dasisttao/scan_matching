@@ -62,7 +62,7 @@ MyPointCloud2D ICP::verwerfung(float filt_distance, MyPointCloud2D &map_corrs, c
     //Removing correspondencies that are too far apart
     for (size_t i = 0; i < scans.distances.size(); i++)
     {
-        if (scans.distances[i] < filt_distance)
+        if (scans.distances[i] < 1)
         {
             temp_scans.distances.push_back(scans.distances[i]);
             temp_scans.ids.push_back(i);
@@ -180,6 +180,13 @@ State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT
         new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
     }
     new_state.yaw = -new_state.yaw;
+    cout << "old yaw: " << state.yaw;
+    cout << "new yaw: " << new_state.yaw;
+    if (state.yaw > 0)
+    {
+        new_state.yaw = -new_state.yaw;
+    }
+
     new_state.yaw = atan2(sin(new_state.yaw), cos(new_state.yaw));
     new_state.yawr = state.yawr;
     new_state.data_flag = 1;
@@ -196,9 +203,11 @@ void ICP::calcWeights(MyPointCloud2D &scans)
         // int index = scans.ids[i];
         // for (int j = 0; j < scans.pts.size(); j++)
         // {
-        //     if ((i != j) && (index = scans.ids[j]))
+        //     if ((i != j) && (index == scans.ids[j]))
         //     {
-        //         sum_dist += scans.distances[j];
+        //         scans.weights[i] = 0;
+        //         break;
+        //         // sum_dist += scans.distances[j];
         //     }
         // }
         // if (sum_dist != 0)
