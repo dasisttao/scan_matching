@@ -22,7 +22,7 @@ public:
     Particle particleFilter(const MyPointCloud2D &map_carpark, vector<Particle> &my_particles);
 
 private:
-    const size_t number_of_iterations = 3;
+    const size_t number_of_iterations = 5;
     const size_t number_of_results = 1;
 
 private:

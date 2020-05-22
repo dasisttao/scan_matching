@@ -25,12 +25,13 @@ public:
   void UpdateMeasurementLidar(const vector<double> &meas_datas);
   void UpdateMeasurementCAN(const vector<double> &meas_datas);
   void UpdateLidar(const vector<double> &meas_datas);
-  void UpdateCAN(const vector<double> &meas_datas);
+  void UpdateCAN(const vector<double> &meas_datas, vector<bool> &ramps);
   void UpdateCorrection(const vector<double> &meas_datas);
   void UpdateCorrection2(const vector<double> &meas_datas);
   vector<double> UpdateCANNot(const vector<double> &meas_datas);
   void UpdateGPS(const vector<double> &meas_datas);
   void UpdateLiderParamter(double dyawr);
+  void UpdateLidarAngle(const vector<double> &meas_datas);
   bool is_initialized_;
 
   // state vector: [pos1 pos2 vel_abs yaw_angle yaw_rate] in SI units and rad
@@ -71,7 +72,8 @@ public:
   double std_radphi_;
   // measurement noise standard deviation angle change in rad/s
   double std_radphip_;
-
+  double speed1;
+  double speed2;
   // Weights of sigma points
   Eigen::VectorXd weights_;
 
@@ -96,11 +98,6 @@ UKF::UKF()
   // initial covariance matrix
   P_ = MatrixXd(5, 5);
 
-  // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1;
-  // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.1;
-
   //@ measurement noise values are provided by the sensor manufacturer.
   //@ measurement noise standard deviation
   //  position1 in m
@@ -114,13 +111,20 @@ UKF::UKF()
   // yaw angle change in rad/s
   std_radphip_ = 0.6; //0.3
 
+  // Process noise standard deviation longitudinal acceleration in m/s^2
+  std_a_ = 1;
+  // Process noise standard deviation yaw acceleration in rad/s^2
+  std_yawdd_ = 1.5;
   //Laser
-  std_laspx_ = 0.02;
+  std_laspx_ = 0.008;
   std_laspy_ = std_laspx_;
   std_lasyaw_ = 0.001;
   //Odot
-  std_odo_yawr = 0.001;
-  std_odo_v = 0.05;
+  std_odo_yawr = 0.0005;
+  std_odo_v = 0.0001;
+
+  speed1 = 0.92;
+  speed2 = 1.08;
 
   time_us_ = 0;
 
@@ -645,7 +649,163 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
   P_ = P_ - K * S * K.transpose();
 }
 
-void UKF::UpdateCAN(const vector<double> &meas_datas)
+void UKF::UpdateLidarAngle(const vector<double> &meas_datas)
+{
+
+  int n_z = 3; // Number of Laser Measurements
+  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
+  //transform sigma points into measurement space
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+
+    // extract values for better readibility
+    double p_x = Xsig_pred_(0, i);
+    double p_y = Xsig_pred_(1, i);
+    double yaw = Xsig_pred_(3, i);
+
+    // measurement model
+    Zsig(0, i) = p_x;
+    Zsig(1, i) = p_y;
+    Zsig(2, i) = yaw;
+  }
+
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
+  z_pred.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  {
+    z_pred = z_pred + weights_(i) * Zsig.col(i);
+  }
+
+  //innovation covariance matrix S
+  MatrixXd S = MatrixXd(n_z, n_z);
+  S.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    z_diff(2) = atan2(sin(z_diff(2)), cos(z_diff(2)));
+    S = S + weights_(i) * z_diff * z_diff.transpose();
+  }
+
+  //add measurement noise covariance matrix
+  MatrixXd R = MatrixXd(n_z, n_z);
+  R << std_laspx_ * std_laspx_, 0, 0,
+      0, std_laspy_ * std_laspy_, 0,
+      0, 0, std_lasyaw_ * std_lasyaw_ * 0.5;
+  S = S + R;
+
+  //--------------------------------------UKF Update
+  VectorXd x_out = VectorXd(5);
+  MatrixXd P_out = MatrixXd(5, 5);
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+
+  //calculate cross correlation matrix
+  Tc.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    // state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    //angle normalization
+    z_diff(2) = atan2(sin(z_diff(2)), cos(z_diff(2)));
+    x_diff(3) = atan2(sin(x_diff(3)), cos(x_diff(3)));
+    // x_diff(2) = x_diff(2) * 0.50;
+    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
+  }
+
+  //Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+
+  //residual
+  VectorXd z = VectorXd(n_z);
+  z << meas_datas[0], meas_datas[1], meas_datas[2];
+  VectorXd z_diff = z - z_pred;
+  z_diff(2) = atan2(sin(z_diff(2)), cos(z_diff(2)));
+  // x_(3) = meas_datas[2]; // Hack, weil normalisieren nicht richtig funktioniert
+  x_ = x_ + K * z_diff;
+  // x_diff(2) = x_diff(2) * 0.50;
+
+  P_ = P_ - K * S * K.transpose();
+}
+// void UKF::UpdateLidarAngle(const vector<double> &meas_datas)
+// {
+
+//   int n_z = 1; // Number of Laser Measurements
+//   MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
+//   //transform sigma points into measurement space
+//   for (int i = 0; i < 2 * n_aug_ + 1; i++)
+//   { //2n+1 simga points
+
+//     // extract values for better readibility
+//     double yaw = Xsig_pred_(3, i);
+
+//     // measurement model
+//     Zsig(0, i) = yaw;
+//   }
+
+//   //mean predicted measurement
+//   VectorXd z_pred = VectorXd(n_z);
+//   z_pred.fill(0.0);
+//   for (int i = 0; i < 2 * n_aug_ + 1; i++)
+//   {
+//     z_pred = z_pred + weights_(i) * Zsig.col(i);
+//   }
+
+//   //innovation covariance matrix S
+//   MatrixXd S = MatrixXd(n_z, n_z);
+//   S.fill(0.0);
+//   for (int i = 0; i < 2 * n_aug_ + 1; i++)
+//   { //2n+1 simga points
+//     //residual
+//     VectorXd z_diff = Zsig.col(i) - z_pred;
+//     z_diff(0) = atan2(sin(z_diff(0)), cos(z_diff(0)));
+//     S = S + weights_(i) * z_diff * z_diff.transpose();
+//   }
+
+//   //add measurement noise covariance matrix
+//   MatrixXd R = MatrixXd(n_z, n_z);
+//   R << std_lasyaw_ * std_lasyaw_;
+//   S = S + R;
+
+//   //--------------------------------------UKF Update
+//   VectorXd x_out = VectorXd(5);
+//   MatrixXd P_out = MatrixXd(5, 5);
+//   MatrixXd Tc = MatrixXd(n_x_, n_z);
+
+//   //calculate cross correlation matrix
+//   Tc.fill(0.0);
+//   for (int i = 0; i < 2 * n_aug_ + 1; i++)
+//   { //2n+1 simga points
+
+//     //residual
+//     VectorXd z_diff = Zsig.col(i) - z_pred;
+//     // state difference
+//     VectorXd x_diff = Xsig_pred_.col(i) - x_;
+//     //angle normalization
+//     z_diff(0) = atan2(sin(z_diff(0)), cos(z_diff(0)));
+//     x_diff(3) = atan2(sin(x_diff(3)), cos(x_diff(3)));
+
+//     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
+//   }
+//   cout << "ich war hier 5!" << endl;
+//   //Kalman gain K;
+//   MatrixXd K = Tc * S.inverse();
+
+//   //residual
+//   VectorXd z = VectorXd(n_z);
+//   z << meas_datas[0];
+//   VectorXd z_diff = z - z_pred;
+//   z_diff(0) = atan2(sin(z_diff(0)), cos(z_diff(0)));
+//   // x_(3) = meas_datas[2]; // Hack, weil normalisieren nicht richtig funktioniert
+//   x_ = x_ + K * z_diff;
+
+//   P_ = P_ - K * S * K.transpose();
+// }
+
+void UKF::UpdateCAN(const vector<double> &meas_datas, vector<bool> &ramps)
 {
   int n_z = 2; //
   MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
@@ -711,11 +871,23 @@ void UKF::UpdateCAN(const vector<double> &meas_datas)
   //residual
   VectorXd z = VectorXd(n_z);
   z << meas_datas[0], meas_datas[1];
+  if (ramps[0] == true)
+  {
+    z(0) = z(0) * speed1;
+    cout << "rampe1" << endl;
+  }
+  if (ramps[1] == true)
+  {
+    z(0) = z(0) * speed2;
+    cout << "rampe2" << endl;
+  }
+
   VectorXd z_diff = z - z_pred;
 
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
   x_(3) = atan2(sin(x_(3)), cos(x_(3)));
+
   P_ = P_ - K * S * K.transpose();
 }
 
@@ -791,7 +963,16 @@ vector<double> UKF::UpdateCANNot(const vector<double> &meas_datas)
   vector<double> results;
   results.push_back(x_(0));
   results.push_back(x_(1));
-  results.push_back(x_(2));
+  if (meas_datas[2] == true)
+  {
+    // cout << "rampe2" << endl;
+    results.push_back(x_(2) * 1);
+  }
+  else
+  {
+    results.push_back(x_(2));
+  }
+
   results.push_back(x_(3));
   results.push_back(x_(4));
   return results;
