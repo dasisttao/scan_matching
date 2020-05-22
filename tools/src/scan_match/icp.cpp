@@ -180,8 +180,7 @@ State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT
         new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
     }
     new_state.yaw = -new_state.yaw;
-    cout << "old yaw: " << state.yaw;
-    cout << "new yaw: " << new_state.yaw;
+
     if (state.yaw > 0)
     {
         new_state.yaw = -new_state.yaw;

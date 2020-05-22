@@ -26,6 +26,9 @@ public:
   void UpdateMeasurementCAN(const vector<double> &meas_datas);
   void UpdateLidar(const vector<double> &meas_datas);
   void UpdateCAN(const vector<double> &meas_datas);
+  void UpdateCorrection(const vector<double> &meas_datas);
+  void UpdateCorrection2(const vector<double> &meas_datas);
+  vector<double> UpdateCANNot(const vector<double> &meas_datas);
   void UpdateGPS(const vector<double> &meas_datas);
   void UpdateLiderParamter(double dyawr);
   bool is_initialized_;
@@ -116,7 +119,7 @@ UKF::UKF()
   std_laspy_ = std_laspx_;
   std_lasyaw_ = 0.001;
   //Odot
-  std_odo_yawr = 0.0001;
+  std_odo_yawr = 0.001;
   std_odo_v = 0.05;
 
   time_us_ = 0;
@@ -396,11 +399,171 @@ void UKF::UpdateMeasurementCAN2(const vector<double> &meas_datas)
 
 //   P_ = (MatrixXd::Identity(5, 5) - K * H) * P_;
 // }
-void UKF::UpdateLiderParamter(double dyawr)
+void UKF::UpdateCorrection(const vector<double> &meas_datas)
 {
-  std_lasyaw_ = dyawr;
-}
 
+  int n_z = 4; // Number of Laser Measurements
+  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
+  //transform sigma points into measurement space
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+
+    // extract values for better readibility
+    double p_x = Xsig_pred_(0, i);
+    double p_y = Xsig_pred_(1, i);
+    double p_v = Xsig_pred_(2, i);
+    double yaw = Xsig_pred_(3, i);
+
+    // measurement model
+    Zsig(0, i) = p_x;
+    Zsig(1, i) = p_y;
+    Zsig(2, i) = p_v;
+    Zsig(3, i) = yaw;
+  }
+
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
+  z_pred.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  {
+    z_pred = z_pred + weights_(i) * Zsig.col(i);
+  }
+
+  //innovation covariance matrix S
+  MatrixXd S = MatrixXd(n_z, n_z);
+  S.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    z_diff(3) = atan2(sin(z_diff(3)), cos(z_diff(3)));
+    S = S + weights_(i) * z_diff * z_diff.transpose();
+  }
+
+  //add measurement noise covariance matrix
+  MatrixXd R = MatrixXd(n_z, n_z);
+  double stdx = 0.0001;
+  double stdy = 0.0001;
+  double stdyaw = 0.0001;
+  double stdv = 0.001;
+  R << stdx * stdx, 0, 0, 0,
+      0, stdy * stdy, 0, 0,
+      0, 0, stdyaw * stdyaw, 0,
+      0, 0, 0, stdv * stdv;
+  S = S + R;
+
+  //--------------------------------------UKF Update
+  VectorXd x_out = VectorXd(5);
+  MatrixXd P_out = MatrixXd(5, 5);
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+
+  //calculate cross correlation matrix
+  Tc.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    // state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    //angle normalization
+    z_diff(3) = atan2(sin(z_diff(3)), cos(z_diff(3)));
+    x_diff(3) = atan2(sin(x_diff(3)), cos(x_diff(3)));
+
+    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
+  }
+
+  //Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+
+  //residual
+  VectorXd z = VectorXd(n_z);
+  z << meas_datas[0], meas_datas[1], meas_datas[2], meas_datas[3];
+  VectorXd z_diff = z - z_pred;
+  z_diff(2) = atan2(sin(z_diff(3)), cos(z_diff(3)));
+  // x_(3) = meas_datas[2]; // Hack, weil normalisieren nicht richtig funktioniert
+  x_ = x_ + K * z_diff;
+
+  P_ = P_ - K * S * K.transpose();
+}
+void UKF::UpdateCorrection2(const vector<double> &meas_datas)
+{
+
+  int n_z = 2; // Number of Laser Measurements
+  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
+  //transform sigma points into measurement space
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+
+    // extract values for better readibility
+    double p_x = Xsig_pred_(0, i);
+    double p_y = Xsig_pred_(1, i);
+
+    // measurement model
+    Zsig(0, i) = p_x;
+    Zsig(1, i) = p_y;
+  }
+
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
+  z_pred.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  {
+    z_pred = z_pred + weights_(i) * Zsig.col(i);
+  }
+
+  //innovation covariance matrix S
+  MatrixXd S = MatrixXd(n_z, n_z);
+  S.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    S = S + weights_(i) * z_diff * z_diff.transpose();
+  }
+
+  //add measurement noise covariance matrix
+  MatrixXd R = MatrixXd(n_z, n_z);
+  double stdx = 0.001;
+  double stdy = 0.001;
+  double stdyaw = 0.001;
+  double stdv = 0.001;
+  R << stdx * stdx, 0,
+      0, stdy * stdy;
+
+  S = S + R;
+
+  //--------------------------------------UKF Update
+  VectorXd x_out = VectorXd(5);
+  MatrixXd P_out = MatrixXd(5, 5);
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+
+  //calculate cross correlation matrix
+  Tc.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    // state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    //angle normalization
+
+    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
+  }
+
+  //Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+
+  //residual
+  VectorXd z = VectorXd(n_z);
+  z << meas_datas[0], meas_datas[1];
+  VectorXd z_diff = z - z_pred;
+  // x_(3) = meas_datas[2]; // Hack, weil normalisieren nicht richtig funktioniert
+  x_ = x_ + K * z_diff;
+
+  P_ = P_ - K * S * K.transpose();
+}
 void UKF::UpdateLidar(const vector<double> &meas_datas)
 {
 
@@ -442,7 +605,6 @@ void UKF::UpdateLidar(const vector<double> &meas_datas)
 
   //add measurement noise covariance matrix
   MatrixXd R = MatrixXd(n_z, n_z);
-  cout << std_lasyaw_ << endl;
   R << std_laspx_ * std_laspx_, 0, 0,
       0, std_laspy_ * std_laspy_, 0,
       0, 0, std_lasyaw_ * std_lasyaw_;
@@ -555,6 +717,88 @@ void UKF::UpdateCAN(const vector<double> &meas_datas)
   x_ = x_ + K * z_diff;
   x_(3) = atan2(sin(x_(3)), cos(x_(3)));
   P_ = P_ - K * S * K.transpose();
+}
+
+vector<double> UKF::UpdateCANNot(const vector<double> &meas_datas)
+{
+  int n_z = 2; //
+  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
+  //transform sigma points into measurement space
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+
+    // measurement model
+    Zsig(0, i) = Xsig_pred_(2, i); //speed
+    Zsig(1, i) = Xsig_pred_(4, i); //yaw_rate
+  }
+
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
+  z_pred.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  {
+    z_pred = z_pred + weights_(i) * Zsig.col(i);
+  }
+
+  //innovation covariance matrix S
+  MatrixXd S = MatrixXd(n_z, n_z);
+  S.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    S = S + weights_(i) * z_diff * z_diff.transpose();
+  }
+
+  //add measurement noise covariance matrix
+  MatrixXd R = MatrixXd(n_z, n_z);
+  // double dyawr = 0.01;
+  // double dv = 0.01;
+
+  R << std_odo_v * std_odo_v, 0,
+      0, std_odo_yawr * std_odo_yawr;
+  S = S + R;
+
+  //--------------------------------------UKF Update
+  VectorXd x_out = VectorXd(5);
+  MatrixXd P_out = MatrixXd(5, 5);
+  MatrixXd Tc = MatrixXd(n_x_, n_z);
+
+  //calculate cross correlation matrix
+  Tc.fill(0.0);
+  for (int i = 0; i < 2 * n_aug_ + 1; i++)
+  { //2n+1 simga points
+
+    //residual
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    // state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    //angle normalization
+    x_diff(3) = atan2(sin(x_diff(3)), cos(x_diff(3)));
+
+    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
+  }
+
+  //Kalman gain K;
+  MatrixXd K = Tc * S.inverse();
+
+  //residual
+  VectorXd z = VectorXd(n_z);
+  z << meas_datas[0], meas_datas[1];
+  VectorXd z_diff = z - z_pred;
+
+  //update state mean and covariance matrix
+  vector<double> results;
+  results.push_back(x_(0));
+  results.push_back(x_(1));
+  results.push_back(x_(2));
+  results.push_back(x_(3));
+  results.push_back(x_(4));
+  return results;
+
+  // x_ = x_ + K * z_diff;
+  // x_(3) = atan2(sin(x_(3)), cos(x_(3)));
+  // P_ = P_ - K * S * K.transpose();
 }
 void UKF::UpdateGPS(const vector<double> &meas_datas)
 {

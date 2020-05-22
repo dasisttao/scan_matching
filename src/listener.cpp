@@ -228,6 +228,80 @@ void dynamikAdjustUKF(double yawr)
   // std_odo_v = 0.05;
 }
 bool init_allign = false;
+double time_start = 0;
+class Plausible
+{
+public:
+  double x1;
+  double x2;
+  double y1;
+  double y2;
+  double yaw1;
+  double yaw2;
+  double v1;
+  double v2;
+};
+Plausible laser;
+Plausible odo;
+bool only_odo = false;
+bool entered_ramp = false;
+bool entered_ramp2 = false;
+double speedred = 0.25;
+bool checkIfRamp()
+{
+  // ukf_filter.x_(2) += ukf_filter.x_(2) * 0.1;
+  //Obere Rampe (1. Rampe)
+  if (entered_ramp == false)
+  {
+    if (ukf_filter.x_(0) > 36 && ukf_filter.x_(0) < 38)
+    {
+      if (ukf_filter.x_(1) > -53.5 && ukf_filter.x_(1) < -48.5)
+      {
+        entered_ramp = true;
+        ukf_filter.x_(2) -= ukf_filter.x_(2) * speedred;
+      }
+    }
+  }
+  else
+  {
+    ukf_filter.x_(2) -= ukf_filter.x_(2) * speedred;
+    if (ukf_filter.x_(0) > 29 && ukf_filter.x_(0) < 30)
+    {
+      if (ukf_filter.x_(1) > -56 && ukf_filter.x_(1) < -50)
+      {
+        entered_ramp = false;
+      }
+    }
+  }
+  //Untere Rampe
+  if (entered_ramp2 == false)
+  {
+    if (ukf_filter.x_(0) > 32 && ukf_filter.x_(0) < 34)
+    {
+      if (ukf_filter.x_(1) > -68 && ukf_filter.x_(1) < -63)
+      {
+        entered_ramp2 = true;
+        ukf_filter.x_(2) -= ukf_filter.x_(2) * speedred;
+      }
+    }
+  }
+  else
+  {
+    ukf_filter.x_(2) -= ukf_filter.x_(2) * speedred;
+    if (ukf_filter.x_(0) > 40.5 && ukf_filter.x_(0) < 42.5)
+    {
+      if (ukf_filter.x_(1) > -65.5 && ukf_filter.x_(1) < -60.5)
+      {
+        entered_ramp2 = false;
+      }
+    }
+  }
+  if (entered_ramp || entered_ramp2)
+  {
+    return true;
+  }
+  return false;
+}
 void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr &gps_data, const autobox_out::ConstPtr &can_data)
 {
 
@@ -241,6 +315,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     init = true;
     measure_state = MeasureState::Odo;
     ukf_filter.time_us_ = gps_data->header.stamp.toSec();
+    time_start = gps_data->header.stamp.toSec();
     new_state.x = ego_pos[0];
     new_state.y = ego_pos[1];
     new_state.yaw = ego_pos[2];
@@ -248,13 +323,25 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     ukf_filter.x_ << ego_pos[0], ego_pos[1], gps_data->ins_vh.In_VXH, ego_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
     return;
   }
-  dynamikAdjustUKF(ukf_filter.x_(4));
+
+  // dynamikAdjustUKF(ukf_filter.x_(4));
   if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 2)
   {
-    if (measure_state == MeasureState::Laser)
+    checkIfRamp();
+    // ukf_filter.x_(2) -= ukf_filter.x_(2) * 0.25;
+    if (measure_state == MeasureState::Laser || !only_odo)
     {
       ukf_filter.Prediction(dt);
-      timer.start();
+      //Für Plausibilität
+      laser.x1 = ukf_filter.x_(0);
+      laser.y1 = ukf_filter.x_(1);
+      laser.yaw1 = ukf_filter.x_(3);
+      laser.v1 = ukf_filter.x_(2);
+      odo.x1 = laser.x1;
+      odo.y1 = laser.y1;
+      odo.yaw1 = laser.yaw1;
+      odo.v1 = laser.v1;
+      //Für Plausibilität ende
       //Setup current state
       state.x = ukf_filter.x_(0);
       state.y = ukf_filter.x_(1);
@@ -324,6 +411,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       scans = icp.mainAlgorithm(map_filt, best_particle.pc, best_particle.state, new_state, best_particle.rotM);
       // scans = icp.mainAlgorithm(map_filt, scans, state, new_state, rotM);
       pc2 = rviz.createPointCloud(scans, "ibeo_lux", 1.1);
+
       if (new_state.data_flag == 0)
       {
         double dt2 = timer.stop();
@@ -338,25 +426,116 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       {
 
         vector<double> meas_data;
+        vector<double> meas_data2;
         meas_data.push_back(new_state.x);
         meas_data.push_back(new_state.y);
         meas_data.push_back(new_state.yaw);
+        //Für Plausibilität Odo
+        meas_data2.push_back(can_data->ros_can_odometrie_msg.velocity_x);
+        meas_data2.push_back(-(can_data->ros_can_odometrie_msg.yaw_rate * M_PI / 180.0));
+        vector<double> results = ukf_filter.UpdateCANNot(meas_data2);
+        odo.x2 = results[0];
+        odo.y2 = results[1];
+        odo.v2 = results[2];
+        odo.yaw2 = results[3];
+        //Für Plausibilität Odo ende
         ukf_filter.UpdateLidar(meas_data);
         ukf_filter.x_(3) = atan2(sin(ukf_filter.x_(3)), cos(ukf_filter.x_(3)));
+        //Für Plausbilität Laser
+        laser.x2 = ukf_filter.x_(0);
+        laser.y2 = ukf_filter.x_(1);
+        laser.v2 = ukf_filter.x_(2);
+        laser.yaw2 = ukf_filter.x_(3);
+        //Für Plausibilität Laser ende
       }
 
       measure_state = MeasureState::Odo;
     }
-    else if (measure_state == MeasureState::Odo || measure_state == MeasureState::GPS)
+    else if (measure_state == MeasureState::Odo || measure_state == MeasureState::GPS || only_odo)
     {
       ukf_filter.Prediction(dt);
       vector<double> meas_data;
       meas_data.push_back(can_data->ros_can_odometrie_msg.velocity_x);
       meas_data.push_back(-(can_data->ros_can_odometrie_msg.yaw_rate * M_PI / 180.0));
       ukf_filter.UpdateCAN(meas_data);
-
       measure_state = MeasureState::Laser;
     }
+    // //Plausiblitäts Check#
+    // //Delta Laser
+    // double dxl = laser.x2 - laser.x1;
+    // double dyl = laser.y2 - laser.y1;
+    // double dvl = laser.v2 - laser.v1;
+    // double dyawl = laser.yaw2 - laser.yaw1;
+    // //Delta Odo
+    // double dxo = odo.x2 - odo.x1;
+    // double dyo = odo.y2 - odo.y1;
+    // double dvo = odo.v2 - odo.v1;
+    // double dyawo = odo.yaw2 - odo.yaw1;
+    // //Delta Laser-Odo
+    // double ddx = abs(dxl) - abs(dxo);
+    // double ddy = abs(dyl) - abs(dyo);
+    // double ddv = abs(dvl) - abs(dvo);
+    // double ddyaw = abs(dyawl) - abs(dyawo);
+
+    // vector<double> state;
+    // state.push_back(ukf_filter.x_(0));
+    // state.push_back(ukf_filter.x_(1));
+    // state.push_back(can_data->ros_can_odometrie_msg.velocity_x);
+    // state.push_back(ukf_filter.x_(3));
+    // state.push_back(-(can_data->ros_can_odometrie_msg.yaw_rate * M_PI / 180.0));
+    // bool correctionFlag = false;
+    // //Delta Laser
+    // if (abs(dxl) > 0.1)
+    // {
+    //   cout << "Laser dxl: " << dxl << endl;
+    //   // state[0] += dxl;
+    // }
+    // if (abs(dyl) > 0.1)
+    // {
+    //   cout << "Laser dyl: " << dyl << endl;
+    //   // state[0] += dyl;
+    // }
+    // if (abs(dyawl) * 180 / M_PI > 3)
+    // {
+    //   cout << "Laser dyawl: " << dyawl << endl;
+    // }
+    // if (abs(dvl) > 0.1)
+    // {
+    //   cout << "Laser dvl: " << dyl << endl;
+    // }
+
+    // if (abs(ddx) > 0.1)
+    // {
+    //   cout << "ddx: " << ddx << endl;
+    //   state[0] -= ddx;
+    //   correctionFlag = true;
+    // }
+
+    // if (abs(ddy) > 0.1)
+    // {
+    //   cout << "ddy: " << ddy << endl;
+    //   state[1] -= ddy;
+    //   correctionFlag = true;
+    // }
+    // //Delta Laser-Odo
+    // if (abs(ddv) > 0.1)
+    // {
+    //   cout << "ddv: " << ddx << endl;
+    // }
+
+    // if (abs(ddyaw) * 180 / M_PI > 3)
+    // {
+    //   cout << "ddyaw: " << ddyaw * 180 / M_PI << endl;
+    //   // correctionFlag = true;
+    // }
+    // if (correctionFlag == true)
+    // {
+    //   ukf_filter.UpdateCorrection(state);
+    // }
+  }
+  else if (int(gps_data->status.Stat_Byte0_GPS_Mode) >= 4)
+  {
+    ukf_filter.x_ << ego_pos[0], ego_pos[1], gps_data->ins_vh.In_VXH, ego_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
   }
   else
   {
@@ -378,11 +557,24 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       vector<double> meas_data;
       meas_data.push_back(can_data->ros_can_odometrie_msg.velocity_x);
       meas_data.push_back(-(can_data->ros_can_odometrie_msg.yaw_rate * M_PI / 180.0));
+
       ukf_filter.UpdateCAN(meas_data);
 
       measure_state = MeasureState::GPS;
     }
   }
+
+  //Plausiblitäts Check ende
+
+  //Rampe Prediction
+  // double time_passed = gps_data->header.stamp.toSec() - time_start;
+  // cout << can_data->ros_can_odometrie_msg.velocity_x << endl;
+  // if ((time_passed > 51 && time_passed < 56) || (time_passed > 66 && time_passed < 69) || (time_passed > 83 && time_passed < 88))
+  // {
+  //   double ds = ukf_filter.x_(2) * dt * ((1 / cos(40 * M_PI / 180.0)) - 1);
+  //   ukf_filter.x_(0) += ds * 1000; //cos(ukf_filter.x_(3) + 1);
+  //   // ukf_filter.x_(1) += ds * sin(ukf_filter.x_(3));
+  // }
 
   // Set Pose_est for rviz (debugging)
   my_pose_est.pose.position.x = ukf_filter.x_(0);
