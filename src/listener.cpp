@@ -258,7 +258,7 @@ bool checkIfRamp()
       if (ukf_filter.x_(1) > -53.5 && ukf_filter.x_(1) < -48.5)
       {
         entered_ramp = true;
-        ukf_filter.x_(2) -= ukf_filter.x_(2) * speedred;
+        // ukf_filter.x_(2) -= ukf_filter.x_(2) * speedred;
       }
     }
   }
@@ -276,21 +276,22 @@ bool checkIfRamp()
   //Untere Rampe
   if (entered_ramp2 == false)
   {
-    if (ukf_filter.x_(0) > 32 && ukf_filter.x_(0) < 34)
+    if (ukf_filter.x_(0) > 34 && ukf_filter.x_(0) < 36)
     {
-      if (ukf_filter.x_(1) > -68 && ukf_filter.x_(1) < -63)
+      if (ukf_filter.x_(1) > -73 && ukf_filter.x_(1) < -68)
       {
         entered_ramp2 = true;
-        ukf_filter.x_(2) -= ukf_filter.x_(2) * speedred;
+        cout << "Rampe2!" << endl;
+        // ukf_filter.x_(2) -= ukf_filter.x_(2) * speedred;
       }
     }
   }
   else
   {
-    ukf_filter.x_(2) -= ukf_filter.x_(2) * speedred;
-    if (ukf_filter.x_(0) > 40.5 && ukf_filter.x_(0) < 42.5)
+    // ukf_filter.x_(2) -= ukf_filter.x_(2) * speedred;
+    if (ukf_filter.x_(0) > 42.5 && ukf_filter.x_(0) < 44)
     {
-      if (ukf_filter.x_(1) > -65.5 && ukf_filter.x_(1) < -60.5)
+      if (ukf_filter.x_(1) > -70 && ukf_filter.x_(1) < -65.5)
       {
         entered_ramp2 = false;
       }
@@ -327,9 +328,9 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
   // dynamikAdjustUKF(ukf_filter.x_(4));
   if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 2)
   {
-    checkIfRamp();
+    only_odo = checkIfRamp();
     // ukf_filter.x_(2) -= ukf_filter.x_(2) * 0.25;
-    if (measure_state == MeasureState::Laser || !only_odo)
+    if (measure_state == MeasureState::Laser && !only_odo)
     {
       ukf_filter.Prediction(dt);
       //Für Plausibilität
