@@ -112,15 +112,15 @@ UKF::UKF()
   std_radphip_ = 0.6; //0.3
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1;
+  std_a_ = 1.5;
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 1.5;
+  std_yawdd_ = 0.85;
   //Laser
-  std_laspx_ = 0.008;
+  std_laspx_ = 0.0078;
   std_laspy_ = std_laspx_;
-  std_lasyaw_ = 0.001;
+  std_lasyaw_ = 0.00163;
   //Odot
-  std_odo_yawr = 0.0005;
+  std_odo_yawr = 0.000065;
   std_odo_v = 0.0001;
 
   speed1 = 0.92;
@@ -874,12 +874,12 @@ void UKF::UpdateCAN(const vector<double> &meas_datas, vector<bool> &ramps)
   if (ramps[0] == true)
   {
     z(0) = z(0) * speed1;
-    cout << "rampe1" << endl;
+    // cout << "rampe1" << endl;
   }
   if (ramps[1] == true)
   {
     z(0) = z(0) * speed2;
-    cout << "rampe2" << endl;
+    // cout << "rampe2" << endl;
   }
 
   VectorXd z_diff = z - z_pred;

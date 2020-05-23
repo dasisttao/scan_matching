@@ -427,7 +427,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       meas_data.push_back(new_state.yaw);
       ukf_filter.UpdateLidar(meas_data);
       ukf_filter.x_(3) = atan2(sin(ukf_filter.x_(3)), cos(ukf_filter.x_(3)));
-      cout << ukf_filter.x_(3) << endl;
+      // cout << ukf_filter.x_(3) << endl;
       // if (new_state.data_flag == 0)
       // {
       //   double dt2 = timer.stop();
