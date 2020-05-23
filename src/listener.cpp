@@ -53,6 +53,7 @@ ros::Publisher my_est_path;
 nav_msgs::Path my_est_path_msg, my_true_path_msg;
 UKF ukf_filter;
 vector<Particle> my_particles;
+geometry_msgs::PoseStamped final_state;
 MyPointCloud2D createScanPoints(sensor_msgs::PointCloud msg)
 {
   MyPointCloud2D scan_points;
@@ -331,6 +332,23 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     ukf_filter.x_ << ego_pos[0], ego_pos[1], gps_data->ins_vh.In_VXH, ego_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
     return;
   }
+
+  //FINAL STATE OUTPUT
+  final_state.header.seq = 0;
+  final_state.header.stamp = ros::Time::now();
+  final_state.pose.orientation.w = 0;
+  final_state.pose.orientation.x = 0;
+  final_state.pose.orientation.y = 0;
+  final_state.pose.orientation.z = 0;
+  vector<double> temp_pos;
+  temp_pos.push_back(ukf_filter.x_(0));
+  temp_pos.push_back(ukf_filter.x_(1));
+  temp_pos.push_back(ukf_filter.x_(3));
+
+  vector<double> pos_final = ukfnode.Local2UTM(temp_pos);
+  final_state.pose.position.x = pos_final[0];
+  final_state.pose.position.y = pos_final[1];
+  final_state.pose.position.z = pos_final[2] * 180.0 / M_PI;
 
   // dynamikAdjustUKF(ukf_filter.x_(4));
   if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 2)
@@ -658,7 +676,7 @@ int main(int argc, char **argv)
   typedef sync_policies::ApproximateTime<PointCloud2, gpsData, autobox_out> MySyncPolicy;
   Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), point_cloud_sub, gps_sub, can_sub);
   sync.registerCallback(boost::bind(&callback, _1, _2, _3));
-
+  auto posepubUTM = nh.advertise<geometry_msgs::PoseStamped>("VehiclePoseFusionUTM", 10);
   auto pc_pub = nh.advertise<sensor_msgs::PointCloud2>("my_point_cloud", 30);
   auto map_pub = nh.advertise<sensor_msgs::PointCloud2>("my_map", 30);
   auto pose_pub = nh.advertise<geometry_msgs::PoseStamped>("my_pose", 30);
@@ -666,6 +684,8 @@ int main(int argc, char **argv)
   ros::Rate rate(60);
   while (ros::ok())
   {
+    final_state.header.stamp = ros::Time::now();
+    posepubUTM.publish(final_state);
     pc2.header.stamp = ros::Time::now();
     pc_pub.publish(pc2);
     my_map.header.stamp = ros::Time::now();
