@@ -116,7 +116,7 @@ void readMapLocal()
 {
   double x, y;
   MyPoint map_pt;
-  io::CSVReader<2> in2("src/scan_matching/map/parkhaus.csv");
+  io::CSVReader<2> in2("src/icp_lokalisierung/scan_matching/map/parkhaus.csv");
   //Local X , Local Y
   in2.read_header(io::ignore_extra_column, "x", "y");
   int i = 0;
@@ -124,9 +124,9 @@ void readMapLocal()
   {
     map_carpark.ids.push_back(i);
 
-    rotatePoint(x, y, -72.6); //+ gegen Uhrzeiger
-    map_pt.x = x + 8;         // + obenrechts
-    map_pt.y = y - 0.6;       // -minus untenrechts
+    rotatePoint(x, y, -72.523); //+ gegen Uhrzeiger
+    map_pt.x = x ; //+ 8;         // + obenrechts
+    map_pt.y = y ; //- 0.6;       // -minus untenrechts
     map_carpark.pts.push_back(map_pt);
     map_carpark.weights.push_back(1);
     map_carpark.distances.push_back(0);
@@ -228,7 +228,7 @@ void dynamikAdjustUKF(double yawr)
   // std_odo_yawr = 0.01;
   // std_odo_v = 0.05;
 }
-bool init_allign = false;
+bool init_allign = false; 
 double time_start = 0;
 class Plausible
 {
@@ -336,22 +336,32 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
   //FINAL STATE OUTPUT
   final_state.header.seq = 0;
   final_state.header.stamp = ros::Time::now();
+  final_state.header.frame_id = "UTM";
+
   final_state.pose.orientation.w = 0;
   final_state.pose.orientation.x = 0;
   final_state.pose.orientation.y = 0;
   final_state.pose.orientation.z = 0;
   vector<double> temp_pos;
-  temp_pos.push_back(ukf_filter.x_(0));
-  temp_pos.push_back(ukf_filter.x_(1));
-  temp_pos.push_back(ukf_filter.x_(3));
+
+temp_pos.push_back(ukf_filter.x_(0));	
+temp_pos.push_back(ukf_filter.x_(1));
+temp_pos.push_back(ukf_filter.x_(3));
+
+
 
   vector<double> pos_final = ukfnode.Local2UTM(temp_pos);
   final_state.pose.position.x = pos_final[0];
   final_state.pose.position.y = pos_final[1];
-  final_state.pose.position.z = pos_final[2] * 180.0 / M_PI;
+  double winkel_end = (atan2(sin(pos_final[2]), cos(pos_final[2])) * 180.0 / M_PI) + 360 - 72.523;
+  if (winkel_end > 360)
+  {
+    winkel_end -= 360;
+  }
+  final_state.pose.position.z = winkel_end;
 
   // dynamikAdjustUKF(ukf_filter.x_(4));
-  if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 2)
+  if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 4)
   {
     first_laser = true;
     vector<bool> ramp = checkIfRamp();
@@ -408,9 +418,9 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
         // my_map = rviz.createPointCloud(map_filt, "ibeo_lux", 1.0);
         // //--4--ICP Algorithmen
         best_particle = icp.particleFilter(map_filt, my_particles);
-        ukf_filter.x_(0) = best_particle.state.x;
-        ukf_filter.x_(1) = best_particle.state.y;
-        ukf_filter.time_us_ = tnow;
+        //ukf_filter.x_(0) = best_particle.state.x;
+        //ukf_filter.x_(1) = best_particle.state.y;
+        //ukf_filter.time_us_ = tnow;
         init_allign = true;
         filter.lateral_max = 75;
         filter.longi_min = -75;
@@ -418,7 +428,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
         filter.lateral_min = -75;
         filter.map_threshold = 75;
 
-        return;
+        //return;
       }
 
       //--1--Reducing ScanPoints
@@ -684,7 +694,7 @@ int main(int argc, char **argv)
   ros::Rate rate(60);
   while (ros::ok())
   {
-    final_state.header.stamp = ros::Time::now();
+
     posepubUTM.publish(final_state);
     pc2.header.stamp = ros::Time::now();
     pc_pub.publish(pc2);

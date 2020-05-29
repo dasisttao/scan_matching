@@ -50,15 +50,15 @@ std::vector<double> UkfNode::Local2UTM(const std::vector<double> &sv)
 	double yutm1 = 5797146.69;
 	double yutm2 = 5797156.54;
 
-	double xworld1 = 0;
-	double xworld2 = 0;
-	double yworld1 = 0;
-	double yworld2 = 32.71;
+	double xworld1 = 0.2;
+	double xworld2 = 0.7056;
+	double yworld1 = -0.2;
+	double yworld2 = 32.8302;
 
 	double dx = xutm1 - xworld1;
 	double dy = yutm1 - yworld1;
 	double arutm = (yutm1 - yutm2) / (xutm1 - xutm2);
-	double arworld = (yworld1 - yworld2) / (xworld1 - xworld2);
+	double arworld = (yworld1 - yworld2) / (xworld1 - xworld2); // Teilen durch 0!?!?
 	double mu = atan(arutm);
 	double ml = atan(arworld);
 
@@ -70,25 +70,17 @@ std::vector<double> UkfNode::Local2UTM(const std::vector<double> &sv)
 	else
 		phi = -(ml - mu);
 
-	MatrixXd DM(2, 2);
-	DM << cos(phi), -sin(phi), sin(phi), cos(phi);
 
-	MatrixXd PW(2, 1);
-	PW << x, y;
-
-	MatrixXd PW_A = DM * PW;
-
-	double xA = PW_A(0, 0);
-	double yA = PW_A(1, 0);
 	double yawA = yaw - phi;
-
-	while (yawA > 2 * M_PI)
+	while (yawA > 2 * M_PI)                                                                                                                                     
 		yawA -= 2. * M_PI;
 	while (yawA < -0)
-		yawA += 2. * M_PI;
+		yawA += 2. * M_PI;	
 
-	double xA2 = xA + dx;
-	double yA2 = yA + dy;
+	double xA2 = x + xutm1 - xworld1;
+	double yA2 = y + yutm1 - yworld1;
+	
+
 
 	std::vector<double> svutm = {xA2, yA2, yawA};
 	return svutm;
@@ -115,10 +107,10 @@ std::vector<double> UkfNode::UTM2Local(const std::vector<double> &sv)
 	double yutm1 = 5797146.69;
 	double yutm2 = 5797156.54;
 
-	double xworld1 = 0;
-	double xworld2 = 0;
-	double yworld1 = 0;
-	double yworld2 = 32.71;
+	double xworld1 = 0.2;
+	double xworld2 = 0.7056;
+	double yworld1 = -0.2;
+	double yworld2 = 32.8302;
 
 	double dx = xutm1 - xworld1;
 	double dy = yutm1 - yworld1;
@@ -376,6 +368,18 @@ bool UkfNode::wgs84Toutm(const std::vector<double> &deg, std::vector<double> &ut
 
 	std::vector<double> wsg_Lon_Lat_Yaw = {Lon, Lat, yaw, utm_Lon_Lat[2]};
 	double utm_yaw = wgs84yaw2utm(wsg_Lon_Lat_Yaw);
+
+
+
+       	double AdmaOffsetX = 1.5; //m
+	double AdmaOffsetY = -0.450;	//m
+	double AdmaOffsetZ = 1.53;	//m
+
+	//@ transform from ADMA-Coordinate to Vehicle-Coordinate.
+	double utm_yaw_rad = utm_yaw / 180.0 * M_PI;		
+	utm_Lon_Lat[0] = utm_Lon_Lat[0] - sin(utm_yaw_rad)*AdmaOffsetX + cos(utm_yaw_rad)*AdmaOffsetY;
+	utm_Lon_Lat[1] = utm_Lon_Lat[1] - cos(utm_yaw_rad)*AdmaOffsetX - sin(utm_yaw_rad)*AdmaOffsetY;
+
 
 	utm.resize(3);
 	utm[0] = utm_Lon_Lat[0];

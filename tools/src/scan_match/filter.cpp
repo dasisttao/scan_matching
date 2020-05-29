@@ -36,7 +36,7 @@ void Filter::allignParticles(vector<Particle> &particles)
         ego_pos << particles[p].state.x, particles[p].state.y;
         for (int i = 0; i < particles[p].pc.pts.size(); i++)
         {
-            temp << particles[p].pc.pts[i].x - 1.5, particles[p].pc.pts[i].y + 0.45; // Scans verruscht.. -1.5 und +0.45 als Korrektur (FÜRS ERSTE!)
+            temp << particles[p].pc.pts[i].x, particles[p].pc.pts[i].y; // Scans verruscht.. -1.5 und +0.45 als Korrektur (FÜRS ERSTE!)
             result = particles[p].rotM * temp + ego_pos;
             particles[p].pc.pts[i].x = result(0);
             particles[p].pc.pts[i].y = result(1);
