@@ -8,20 +8,22 @@ add_library(
     src/scan_match/icp.cpp
     src/scan_match/utils.hpp
     src/scan_match/utils.cpp
+    src/scan_match/transform.hpp
+    src/scan_match/transform.cpp
     src/scan_match/var_defs.hpp
 
 )
 add_library(csv INTERFACE)
 add_library(kdtree INTERFACE)
-add_library(gps_transforms INTERFACE)
-add_library(ukf2 INTERFACE)
+add_library(ukf INTERFACE)
+add_library(map INTERFACE)
 
 
 target_include_directories(scan_match PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" )
 target_include_directories(csv INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src" )
 target_include_directories(kdtree INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src" )
-target_include_directories(gps_transforms INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src" )
-target_include_directories(ukf2 INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src" )
+target_include_directories(ukf INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src" )
+target_include_directories(map INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src" )
 
 
 target_compile_definitions(scan_match PUBLIC SCAN_MATCH_VERSION=4)

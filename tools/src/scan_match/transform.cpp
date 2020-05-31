@@ -1,38 +1,6 @@
-#ifndef UKF_NODE_HPP_
-#define UKF_NODE_HPP_
+#include <scan_match/transform.hpp>
 
-#include "ros_can_gps_msg/gpsData.h"
-#include <ros/ros.h>
-#include <nav_msgs/Path.h>
-#include <geometry_msgs/Quaternion.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/PoseWithCovarianceStamped.h>
-#include <tf/tf.h>
-#include <tf2/LinearMath/Quaternion.h>
-#include <scan_match/var_defs.hpp>
-
-using Eigen::Map;
-using Eigen::MatrixXd;
-using Eigen::VectorXd;
-
-class UkfNode
-{
-public:
-	std::vector<double> Local2UTM(const std::vector<double> &sv);
-	// @Transform from UTM coordinate to Local
-	std::vector<double> UTM2Local(const std::vector<double> &sv);
-	// @Transform wgs84 coordinates to utm
-	bool wgs84deg2utm(const std::vector<double> &deg, std::vector<double> &utm);
-	// @Transform wgs84 orientation to utm
-	double wgs84yaw2utm(const std::vector<double> &deg);
-	// @Transform wgs84 coordinates and orientation to utm
-	bool wgs84Toutm(const std::vector<double> &deg, std::vector<double> &utm);
-};
-
-// @Transform from Local coordinate to utm
-// @@input: sv = [Local_x, Local_y, Local_yaw]
-// @@output: [ UTM_LONG, UTM_LAT, UTM_YAW ]
-std::vector<double> UkfNode::Local2UTM(const std::vector<double> &sv)
+std::vector<double> CoordTransform::Local2UTM(const std::vector<double> &sv)
 {
 	double x = sv[0];
 	double y = sv[1];
@@ -70,17 +38,14 @@ std::vector<double> UkfNode::Local2UTM(const std::vector<double> &sv)
 	else
 		phi = -(ml - mu);
 
-
 	double yawA = yaw - phi;
-	while (yawA > 2 * M_PI)                                                                                                                                     
+	while (yawA > 2 * M_PI)
 		yawA -= 2. * M_PI;
 	while (yawA < -0)
-		yawA += 2. * M_PI;	
+		yawA += 2. * M_PI;
 
 	double xA2 = x + xutm1 - xworld1;
 	double yA2 = y + yutm1 - yworld1;
-	
-
 
 	std::vector<double> svutm = {xA2, yA2, yawA};
 	return svutm;
@@ -89,7 +54,7 @@ std::vector<double> UkfNode::Local2UTM(const std::vector<double> &sv)
 // @Transform from UTM coordinate to Local
 // @@input: sv = [ UTM_LONG, UTM_LAT, UTM_YAW ]
 // @@output: [Local_x, Local_y, Local_yaw]
-std::vector<double> UkfNode::UTM2Local(const std::vector<double> &sv)
+std::vector<double> CoordTransform::UTM2Local(const std::vector<double> &sv)
 {
 	double x = sv[0];
 	double y = sv[1];
@@ -152,7 +117,7 @@ std::vector<double> UkfNode::UTM2Local(const std::vector<double> &sv)
 // @Transform wgs84 coordinates to utm
 // @@input: deg: WGS84_LONG, WGS84_LAT
 // @@output: utm: UTM_LONG, UTM_LAT, UTM_ZONE_No, UTM_ZONE_Char(ASCii)
-bool UkfNode::wgs84deg2utm(const std::vector<double> &deg, std::vector<double> &utm)
+bool CoordTransform::wgs84deg2utm(const std::vector<double> &deg, std::vector<double> &utm)
 {
 	if (deg.size() != 2)
 		return false;
@@ -325,7 +290,7 @@ bool UkfNode::wgs84deg2utm(const std::vector<double> &deg, std::vector<double> &
 // @Transform wgs84 orientation to utm
 // @@input: deg: WGS84_LONG, WGS84_LAT, UTM_ZONE_No, WGS84_YAW
 // @@output: UTM_YAW
-double UkfNode::wgs84yaw2utm(const std::vector<double> &deg)
+double CoordTransform::wgs84yaw2utm(const std::vector<double> &deg)
 {
 	// if (deg.size() != 4)
 	double Lon = deg[0];
@@ -353,7 +318,7 @@ double UkfNode::wgs84yaw2utm(const std::vector<double> &deg)
 // @Transform wgs84 coordinates and orientation to utm
 // @@input: deg: WGS84_LONG, WGS84_LAT, WGS84_YAW
 // @@output: utm: UTM_LONG, UTM_LAT, UTM_YAW
-bool UkfNode::wgs84Toutm(const std::vector<double> &deg, std::vector<double> &utm)
+bool CoordTransform::wgs84Toutm(const std::vector<double> &deg, std::vector<double> &utm)
 {
 	if (deg.size() != 3)
 		return false;
@@ -369,17 +334,14 @@ bool UkfNode::wgs84Toutm(const std::vector<double> &deg, std::vector<double> &ut
 	std::vector<double> wsg_Lon_Lat_Yaw = {Lon, Lat, yaw, utm_Lon_Lat[2]};
 	double utm_yaw = wgs84yaw2utm(wsg_Lon_Lat_Yaw);
 
-
-
-       	double AdmaOffsetX = 1.5; //m
-	double AdmaOffsetY = -0.450;	//m
-	double AdmaOffsetZ = 1.53;	//m
+	double AdmaOffsetX = 1.5;	 //m
+	double AdmaOffsetY = -0.450; //m
+	double AdmaOffsetZ = 1.53;	 //m
 
 	//@ transform from ADMA-Coordinate to Vehicle-Coordinate.
-	double utm_yaw_rad = utm_yaw / 180.0 * M_PI;		
-	utm_Lon_Lat[0] = utm_Lon_Lat[0] - sin(utm_yaw_rad)*AdmaOffsetX + cos(utm_yaw_rad)*AdmaOffsetY;
-	utm_Lon_Lat[1] = utm_Lon_Lat[1] - cos(utm_yaw_rad)*AdmaOffsetX - sin(utm_yaw_rad)*AdmaOffsetY;
-
+	double utm_yaw_rad = utm_yaw / 180.0 * M_PI;
+	utm_Lon_Lat[0] = utm_Lon_Lat[0] - sin(utm_yaw_rad) * AdmaOffsetX + cos(utm_yaw_rad) * AdmaOffsetY;
+	utm_Lon_Lat[1] = utm_Lon_Lat[1] - cos(utm_yaw_rad) * AdmaOffsetX - sin(utm_yaw_rad) * AdmaOffsetY;
 
 	utm.resize(3);
 	utm[0] = utm_Lon_Lat[0];
@@ -389,4 +351,33 @@ bool UkfNode::wgs84Toutm(const std::vector<double> &deg, std::vector<double> &ut
 	return true;
 }
 
-#endif
+vector<double> CoordTransform::getLocalPoseFromGPS(const gpsData::ConstPtr &gps_data, geometry_msgs::PoseStamped &gps_pose)
+{
+	vector<double> wgs84_pt;
+	vector<double> utm_pt;
+	vector<double> utm_local_pt;
+	//Transform from WGS84 to UTM
+	wgs84_pt.push_back(gps_data->ins_pos_abs.In_Long);
+	wgs84_pt.push_back(gps_data->ins_pos_abs.In_Lat);
+	wgs84_pt.push_back(gps_data->ins_angle_gps_course.Angle_Yaw);
+	wgs84_pt.push_back(32);
+	//Adjust for Meridian Convergence_
+	double utm_yaw = wgs84yaw2utm(wgs84_pt);
+	wgs84_pt.pop_back();
+	wgs84Toutm(wgs84_pt, utm_pt);
+
+	//Transform from UTM to Local
+	utm_local_pt = UTM2Local(utm_pt);
+	utm_local_pt[2] = -(utm_yaw - 90) * M_PI / 180.0;
+
+	//Set Pose for rviz (debugging)
+	gps_pose.pose.position.x = utm_local_pt[0];
+	gps_pose.pose.position.y = utm_local_pt[1];
+	gps_pose.pose.position.z = 1.1;
+	gps_pose.pose.orientation.z = 0;
+	gps_pose.pose.orientation.y = 1;
+	gps_pose.pose.orientation.x = 0;
+	gps_pose.pose.orientation.w = 1;
+
+	return utm_local_pt;
+}

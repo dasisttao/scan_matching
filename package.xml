@@ -19,7 +19,8 @@
   <build_depend>message_filters</build_depend>
   <build_depend>ukf_state_msg</build_depend>
   <build_depend>geodesy</build_depend>
-  <build_depend>ukf2</build_depend>
+  <build_depend>ukf</build_depend>
+  <build_depend>map</build_depend>
   <build_export_depend>message_filters</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
@@ -28,7 +29,8 @@
   <build_export_depend>std_msgs</build_export_depend>
   <build_export_depend>ukf_state_msg</build_export_depend>
   <build_export_depend>geodesy</build_export_depend>
-  <build_export_depend>ukf2</build_export_depend>
+  <build_export_depend>ukf</build_export_depend>
+  <build_export_depend>map</build_export_depend>
   <exec_depend>message_filters</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
@@ -38,8 +40,8 @@
   <exec_depend>message_runtime</exec_depend>
   <exec_depend>ukf_state_msg</exec_depend>
   <exec_depend>geodesy</exec_depend>
-  <exec_depend>ukf2</exec_depend>
-
+  <exec_depend>ukf</exec_depend>
+  <exec_depend>map</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

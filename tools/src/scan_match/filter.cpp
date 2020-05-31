@@ -25,25 +25,6 @@ MyPointCloud2D Filter::getScanPointsWithinThreshold(MyPointCloud2D scans)
     return scans_filt;
 }
 
-void Filter::allignParticles(vector<Particle> &particles)
-{
-    Vector2d ego_pos;
-    Vector2d temp;
-    Vector2d result;
-
-    for (int p = 0; p < particles.size(); p++)
-    {
-        ego_pos << particles[p].state.x, particles[p].state.y;
-        for (int i = 0; i < particles[p].pc.pts.size(); i++)
-        {
-            temp << particles[p].pc.pts[i].x, particles[p].pc.pts[i].y; // Scans verruscht.. -1.5 und +0.45 als Korrektur (FÜRS ERSTE!)
-            result = particles[p].rotM * temp + ego_pos;
-            particles[p].pc.pts[i].x = result(0);
-            particles[p].pc.pts[i].y = result(1);
-        }
-    }
-}
-
 Matrix2d Filter::allignScanPoints(MyPointCloud2D &scans, const State &state)
 {
     Matrix2d rot_M;
@@ -59,7 +40,7 @@ Matrix2d Filter::allignScanPoints(MyPointCloud2D &scans, const State &state)
         -sin(alpha), cos(alpha);
     for (int i = 0; i < scans.pts.size(); i++)
     {
-        temp << scans.pts[i].x - 1.5, scans.pts[i].y + 0.45; // Scans verruscht.. -1.5 und +0.45 als Korrektur (FÜRS ERSTE!)
+        temp << scans.pts[i].x, scans.pts[i].y;
         result = rot_M * temp + ego_pos;
         scans.pts[i].x = result(0);
         scans.pts[i].y = result(1);
@@ -87,4 +68,23 @@ MyPointCloud2D Filter::reduceMap(MyPointCloud2D map_carpark, const State &state)
         }
     }
     return map_filt;
+}
+
+sensor_msgs::PointCloud Filter::filterLaserChannel(sensor_msgs::PointCloud pc)
+{
+    sensor_msgs::PointCloud new_pc;
+    new_pc.header = pc.header;
+    geometry_msgs::Point32 point;
+    sensor_msgs::ChannelFloat32 channel;
+
+    for (int i = 0; i < pc.channels[0].values.size(); i++)
+    {
+        if (!(pc.channels[0].values[i] == 0) || pc.channels[0].values[i] == 6 || pc.channels[0].values[i] == 4 || pc.channels[0].values[i] == 5 || pc.channels[0].values[i] == 7)
+        {
+            channel.values.push_back(pc.channels[0].values[i]);
+            new_pc.points.push_back(pc.points[i]);
+        }
+    }
+    new_pc.channels.push_back(channel);
+    return new_pc;
 }

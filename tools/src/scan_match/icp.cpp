@@ -15,7 +15,6 @@ void ICP::calcEqPoints(MyPointCloud2D map_corrs, MyPointCloud2D scans, Matrix2d 
         scan_bar(0) += scans.pts[i].x * scans.weights[i];
         scan_bar(1) += scans.pts[i].y * scans.weights[i];
     }
-
     for (size_t i = 0; i < map_corrs.pts.size(); i++)
     {
         map_corrs.pts[i].x -= map_bar(0);
@@ -43,7 +42,6 @@ void ICP::calcEqPoints(MyPointCloud2D map_corrs, MyPointCloud2D scans, Matrix2d 
         d += scans.pts[i].y * map_corrs.pts[i].y;
     }
     N << a, b, c, d;
-
     Eigen::JacobiSVD<Matrix2d> svd;
     svd.compute(N, ComputeFullU | ComputeFullV);
     double detUV = (svd.matrixU() * svd.matrixV().transpose()).determinant();
@@ -58,7 +56,7 @@ MyPointCloud2D ICP::verwerfung(float filt_distance, MyPointCloud2D &map_corrs, c
     MyPointCloud2D temp_scans;
     MyPointCloud2D temp_map_corrs;
     MyPoint temp_pt;
-
+    int index;
     //Removing correspondencies that are too far apart
     for (size_t i = 0; i < scans.distances.size(); i++)
     {
@@ -74,7 +72,7 @@ MyPointCloud2D ICP::verwerfung(float filt_distance, MyPointCloud2D &map_corrs, c
             temp_map_corrs.distances.push_back(map_corrs.distances[i]);
             temp_map_corrs.ids.push_back(i);
             temp_map_corrs.weights.push_back(1);
-            int index = scans.ids[i];
+            index = scans.ids[i];
             temp_pt.x = map_carpark.pts[index].x;
             temp_pt.y = map_carpark.pts[index].y;
             temp_map_corrs.pts.push_back(temp_pt);
@@ -86,35 +84,34 @@ MyPointCloud2D ICP::verwerfung(float filt_distance, MyPointCloud2D &map_corrs, c
 
 float ICP::getFiltDistance(float error_before_matching, float ratio_corres_last_timestep)
 {
-    float filt_distance;
+    // float filt_distance;
+    // if (error_before_matching >= 3)
+    // {
+    //     filt_distance = 5;
+    // }
+    // else if ((error_before_matching < 3) && (error_before_matching >= 2))
+    // {
+    //     filt_distance = 3.8;
+    // }
+    // else if ((error_before_matching < 2) && (error_before_matching >= 1.5))
+    // {
+    //     filt_distance = 2.7;
+    // }
+    // else if ((error_before_matching < 1.5) && (error_before_matching >= 1))
+    // {
+    //     filt_distance = 1.9;
+    // }
+    // else
+    // {
+    //     filt_distance = 1.0;
+    // }
 
-    if (error_before_matching >= 3)
-    {
-        filt_distance = 5;
-    }
-    else if ((error_before_matching < 3) && (error_before_matching >= 2))
-    {
-        filt_distance = 3.8;
-    }
-    else if ((error_before_matching < 2) && (error_before_matching >= 1.5))
-    {
-        filt_distance = 2.7;
-    }
-    else if ((error_before_matching < 1.5) && (error_before_matching >= 1))
-    {
-        filt_distance = 1.9;
-    }
-    else
-    {
-        filt_distance = 1.0;
-    }
-
-    if (ratio_corres_last_timestep > 0.8)
-    {
-        filt_distance = 1.0;
-    }
-    filt_distance = error_before_matching + 0.2;
-    return filt_distance;
+    // if (ratio_corres_last_timestep > 0.8)
+    // {
+    //     filt_distance = 1.0;
+    // }
+    // filt_distance = error_before_matching + 0.2;
+    return 1;
 }
 void ICP::createPointCloud2D(PointCloud2D<float> &pc, const MyPointCloud2D &my_pc)
 {
@@ -170,7 +167,6 @@ State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT
     new_state.y = new_pos(1);
     new_state.v = state.v;
     new_state.yaw = state.yaw;
-
     if (abs(state.yaw + acos(TR[number_of_iterations](0, 0))) < M_PI)
     {
         new_state.yaw = acos(new_rot(0, 0));
@@ -185,10 +181,8 @@ State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT
     {
         new_state.yaw = -new_state.yaw;
     }
-
     new_state.yaw = atan2(sin(new_state.yaw), cos(new_state.yaw));
     new_state.yawr = state.yawr;
-    new_state.data_flag = 1;
     return new_state;
 }
 
@@ -242,36 +236,6 @@ void transformLast(Matrix2d TR, Vector2d TT, MyPointCloud2D &scans_kd)
         scans_kd.pts[i].y = TR(1, 0) * scans_kd.pts[i].x + TR(1, 1) * scans_kd.pts[i].y + TT(1);
     }
 }
-Particle ICP::particleFilter(const MyPointCloud2D &map_carpark, vector<Particle> &my_particles)
-{
-    vector<float> particle_errors;
-    PointCloud2D<float> cloudMap;
-
-    // kd-Baum erstellen
-    createPointCloud2D(cloudMap, map_carpark);
-    my_kd_tree_t index(2 /*dim*/, cloudMap, nanoflann::KDTreeSingleIndexAdaptorParams(10 /*max leaf*/));
-    index.buildIndex();
-    for (int p = 0; p < my_particles.size(); p++)
-    {
-        //Create PointCloud
-        PointCloud2D<float> cloudScan;
-        MyPointCloud2D map_corrs;
-        createPointCloud2D(cloudScan, my_particles[p].pc);
-        float distance_total_sqr = 0;
-        map_corrs = findNeigherstNeighbor(cloudMap, cloudScan, my_particles[p].pc, distance_total_sqr, index);
-        float error_test = sqrt(distance_total_sqr / map_corrs.pts.size());
-        // MyPointCloud2D scans_kd = verwerfung(1, map_corrs, my_particles[p].pc, map_carpark);
-        // for (float distance : scans_kd.distances)
-        // {
-        //     distance_total_sqr += distance;
-        // }
-        particle_errors.push_back(distance_total_sqr / map_corrs.pts.size());
-        cout << "Error particle Nr." << p << " :" << error_test << endl;
-    }
-    cout << "______________" << endl;
-    int minErrorParticleIndex = std::min_element(particle_errors.begin(), particle_errors.end()) - particle_errors.begin();
-    return my_particles[minErrorParticleIndex];
-}
 
 MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointCloud2D &scans, State state, State &new_state, Matrix2d &rotM)
 {
@@ -308,12 +272,6 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
             error[iterICP] = sqrt(distance_total_sqr / map_corrs.pts.size());
             float filt_distance = getFiltDistance(error[iterICP], 0.1 /*timestep => später variable*/);
             scans_kd = verwerfung(filt_distance, map_corrs, scans, map_carpark);
-            // cout << error[iterICP] << endl;
-            if (error[iterICP] > 300)
-            {
-                new_state.data_flag = 0;
-                return scans_kd;
-            }
             createPointCloud2D(cloudScan, scans_kd);
         }
         else

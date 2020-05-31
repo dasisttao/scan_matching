@@ -19,7 +19,6 @@ public:
     State matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT, State state, Matrix2d &rotM);
     void calcWeights(MyPointCloud2D &scans);
     MyPointCloud2D mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointCloud2D &scans, State state, State &new_state, Matrix2d &rotM);
-    Particle particleFilter(const MyPointCloud2D &map_carpark, vector<Particle> &my_particles);
 
 private:
     const size_t number_of_iterations = 5;
