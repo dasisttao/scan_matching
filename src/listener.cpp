@@ -22,7 +22,7 @@
 #include <scan_match/icp.hpp>
 #include <scan_match/utils.hpp>
 #include <csv/csv.h>
-#include <csv/output_csv.h>
+#include <csv/csv_main.h>
 #include <scan_match/transform.hpp>
 #include <scan_match/debugging.hpp>
 
@@ -32,7 +32,8 @@ using namespace geometry_msgs;
 using namespace ukf_state_msg;
 using namespace ros_can_gps_msg;
 using namespace Model_Development_bridge;
-using namespace OutputCSV;
+using namespace WriteCSV;
+using namespace ReadCSV;
 
 //Variablen
 bool init = false;
@@ -85,11 +86,13 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
   double dt = tnow - ukf_filter.time_us_;
   if (!init)
   {
-    OutputCSV::outputCSV();
     init = true;
     //Read map
     // readMapUTM(); // another map
     my_map.readMapParkhaus(map_pc, map_carpark);
+
+    //ReadCSV Kalman
+    ReadCSV::kalmanCSV(ukf_filter);
 
     //Get Local Pose
     vector<double> local_pos = coord_transform.getLocalPoseFromGPS(gps_data, gps_pose);
@@ -103,6 +106,8 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     measure_state = MeasureState::Odo;
     return;
   }
+  //Save last state in csv
+  WriteCSV::kalmanCSV(ukf_filter);
   //Setup current state for ICP Algorithm
   state.x = ukf_filter.x_(0);
   state.y = ukf_filter.x_(1);
@@ -153,8 +158,8 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       ukf_filter.UpdateLaser(icp_state);
 
       //Plausability - First Odo, then Laser, because State is getting changed on Laser Update
-      // plausability.times.push_back((gps_data->header.stamp.toSec() - time_start));
-      // plausability.setStateOdo(ukf_filter.UpdateOdometriePlausability(can_data, on_ramp));
+      plausability.times.push_back((gps_data->header.stamp.toSec() - time_start));
+      plausability.setStateOdo(ukf_filter.UpdateOdometriePlausability(can_data, on_ramp));
       plausability.setStateICP(ukf_filter);
 
       //!!!For RVIZ !!! NOTE: comment this out on release versions to save resources
@@ -168,7 +173,6 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     {
       ukf_filter.Prediction(dt);
       ukf_filter.UpdateOdometrie(can_data, on_ramp);
-
       measure_state = MeasureState::Laser;
     }
   }
@@ -225,7 +229,7 @@ int main(int argc, char **argv)
     pose_est_pub.publish(pose_estimation);
     ros::spinOnce();
     rate.sleep();
-    }
+  }
 
   return 0;
 }

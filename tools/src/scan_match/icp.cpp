@@ -104,17 +104,15 @@ State ICP::matchingResult(const vector<Matrix2d> &TR, const vector<Vector2d> &TT
     new_state.x = new_pos(0);
     new_state.y = new_pos(1);
     new_state.v = state.v;
-    new_state.yaw = state.yaw;
     if (abs(state.yaw + acos(TR[number_of_iterations](0, 0))) < M_PI)
     {
-        new_state.yaw = acos(new_rot(0, 0));
+        new_state.yaw = -acos(new_rot(0, 0));
     }
     else
     {
         new_state.yaw = 2 * M_PI - acos(new_rot(0, 0));
     }
-    //Adjusting signs...This seems to work somehow..
-    new_state.yaw = -new_state.yaw;
+
     if (state.yaw > 0)
     {
         new_state.yaw = -new_state.yaw;
@@ -191,15 +189,8 @@ MyPointCloud2D ICP::mainAlgorithm(const MyPointCloud2D &map_carpark, MyPointClou
         // LastTransform (Matlab)
         transformLast(TR[iterICP + 1], TT[iterICP + 1], scans_kd);
     }
-    // for (int i = 0; i < error.size(); i++)
-    // {
-    //     cout << "error: " << error[i] << endl;
-    // }
-    // cout << "_______________" << endl;
 
     new_state = matchingResult(TR, TT, state, rotM);
-
-    // timer.stop("kd");
     //Return scans_kd für rviz
     return scans_kd;
 }

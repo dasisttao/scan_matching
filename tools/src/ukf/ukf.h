@@ -25,7 +25,7 @@ public:
   UKF();
   virtual ~UKF(){};
   void Prediction(double delta_t);
-  void UpdateLaser(State icp_state);
+  void UpdateLaser(const State &icp_state);
   void UpdateOdometrie(const autobox_out::ConstPtr &can_data, vector<bool> &ramps);
   State UpdateOdometriePlausability(const autobox_out::ConstPtr &can_data, vector<bool> &ramps);
   void UpdateGPS(const gpsData::ConstPtr &gps_data, geometry_msgs::PoseStamped &gps_pose);
@@ -124,8 +124,8 @@ UKF::UKF()
   std_odo_yawr = 0.000065;
   std_odo_v = 0.0001;
 
-  speed1 = 0.92;
-  speed2 = 1.08;
+  speed1 = 1;
+  speed2 = 1;
 
   time_us_ = 0;
 
@@ -293,7 +293,7 @@ void UKF::Prediction(double delta_t)
   }
 }
 
-void UKF::UpdateLaser(State icp_state)
+void UKF::UpdateLaser(const State &icp_state)
 {
   vector<double> meas_data;
   meas_data.push_back(icp_state.x);
@@ -372,10 +372,10 @@ void UKF::UpdateLaser(State icp_state)
   z << meas_data[0], meas_data[1], meas_data[2];
   VectorXd z_diff = z - z_pred;
   z_diff(2) = atan2(sin(z_diff(2)), cos(z_diff(2)));
-  // x_(3) = meas_datas[2]; // Hack, weil normalisieren nicht richtig funktioniert
   x_ = x_ + K * z_diff;
-  x_(3) = atan2(sin(x_(3)), cos(x_(3)));
+
   P_ = P_ - K * S * K.transpose();
+  x_(3) = atan2(sin(x_(3)), cos(x_(3)));
 }
 
 void UKF::UpdateOdometrie(const autobox_out::ConstPtr &can_data, vector<bool> &ramps)
@@ -450,12 +450,10 @@ void UKF::UpdateOdometrie(const autobox_out::ConstPtr &can_data, vector<bool> &r
   if (ramps[0] == true)
   {
     z(0) = z(0) * speed1;
-    // cout << "rampe1" << endl;
   }
   if (ramps[1] == true)
   {
     z(0) = z(0) * speed2;
-    // cout << "rampe2" << endl;
   }
 
   VectorXd z_diff = z - z_pred;
