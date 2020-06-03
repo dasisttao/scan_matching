@@ -22,7 +22,9 @@
 #include <scan_match/icp.hpp>
 #include <scan_match/utils.hpp>
 #include <csv/csv.h>
+#include <csv/output_csv.h>
 #include <scan_match/transform.hpp>
+#include <scan_match/debugging.hpp>
 
 using namespace sensor_msgs;
 using namespace message_filters;
@@ -30,6 +32,7 @@ using namespace geometry_msgs;
 using namespace ukf_state_msg;
 using namespace ros_can_gps_msg;
 using namespace Model_Development_bridge;
+using namespace OutputCSV;
 
 //Variablen
 bool init = false;
@@ -40,6 +43,7 @@ ICP icp;
 RVIZ rviz;
 Ramp ramp;
 MyMap my_map;
+Plausability plausability;
 CoordTransform coord_transform;
 State state, icp_state;
 sensor_msgs::PointCloud2 pc2, map_pc;
@@ -81,6 +85,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
   double dt = tnow - ukf_filter.time_us_;
   if (!init)
   {
+    OutputCSV::outputCSV();
     init = true;
     //Read map
     // readMapUTM(); // another map
@@ -104,6 +109,9 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
   state.v = ukf_filter.x_(2);
   state.yaw = ukf_filter.x_(3);
   state.yawr = ukf_filter.x_(4);
+
+  //Plausability
+  plausability.setState(state);
 
   //Display estimated pose on rviz
   rviz.displayEstimatedPose(state, pose_estimation);
@@ -144,6 +152,11 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       //Update UKF Laser
       ukf_filter.UpdateLaser(icp_state);
 
+      //Plausability - First Odo, then Laser, because State is getting changed on Laser Update
+      // plausability.times.push_back((gps_data->header.stamp.toSec() - time_start));
+      // plausability.setStateOdo(ukf_filter.UpdateOdometriePlausability(can_data, on_ramp));
+      plausability.setStateICP(ukf_filter);
+
       //!!!For RVIZ !!! NOTE: comment this out on release versions to save resources
       map_pc = rviz.createPointCloud(map_filt, "ibeo_lux", 1.0);
       pc2 = rviz.createPointCloud(scans, "ibeo_lux", 1.1);
@@ -155,6 +168,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     {
       ukf_filter.Prediction(dt);
       ukf_filter.UpdateOdometrie(can_data, on_ramp);
+
       measure_state = MeasureState::Laser;
     }
   }
@@ -169,6 +183,9 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     // ukf_filter.UpdateGPS(gps_data, gps_pose);
     measure_state = MeasureState::GPS;
   }
+
+  //Plausability Checks
+  plausability.deltaOdoICP();
 
   ukf_filter.time_us_ = tnow;
 }
@@ -208,7 +225,7 @@ int main(int argc, char **argv)
     pose_est_pub.publish(pose_estimation);
     ros::spinOnce();
     rate.sleep();
-  }
+    }
 
   return 0;
 }

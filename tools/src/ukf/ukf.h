@@ -27,7 +27,7 @@ public:
   void Prediction(double delta_t);
   void UpdateLaser(State icp_state);
   void UpdateOdometrie(const autobox_out::ConstPtr &can_data, vector<bool> &ramps);
-  vector<double> UpdateCANNot(const vector<double> &meas_datas);
+  State UpdateOdometriePlausability(const autobox_out::ConstPtr &can_data, vector<bool> &ramps);
   void UpdateGPS(const gpsData::ConstPtr &gps_data, geometry_msgs::PoseStamped &gps_pose);
   bool is_initialized_;
 
@@ -467,9 +467,12 @@ void UKF::UpdateOdometrie(const autobox_out::ConstPtr &can_data, vector<bool> &r
   P_ = P_ - K * S * K.transpose();
 }
 
-vector<double> UKF::UpdateCANNot(const vector<double> &meas_datas)
+State UKF::UpdateOdometriePlausability(const autobox_out::ConstPtr &can_data, vector<bool> &ramps)
 {
   int n_z = 2; //
+  vector<double> meas_data;
+  meas_data.push_back(can_data->ros_can_odometrie_msg.velocity_x);
+  meas_data.push_back(-(can_data->ros_can_odometrie_msg.yaw_rate * M_PI / 180.0));
   MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
   //transform sigma points into measurement space
   for (int i = 0; i < 2 * n_aug_ + 1; i++)
@@ -532,30 +535,32 @@ vector<double> UKF::UpdateCANNot(const vector<double> &meas_datas)
 
   //residual
   VectorXd z = VectorXd(n_z);
-  z << meas_datas[0], meas_datas[1];
+  z << meas_data[0], meas_data[1];
+  if (ramps[0] == true)
+  {
+    z(0) = z(0) * speed1;
+    // cout << "rampe1" << endl;
+  }
+  if (ramps[1] == true)
+  {
+    z(0) = z(0) * speed2;
+    // cout << "rampe2" << endl;
+  }
+
   VectorXd z_diff = z - z_pred;
 
   //update state mean and covariance matrix
-  vector<double> results;
-  results.push_back(x_(0));
-  results.push_back(x_(1));
-  if (meas_datas[2] == true)
-  {
-    // cout << "rampe2" << endl;
-    results.push_back(x_(2) * 1);
-  }
-  else
-  {
-    results.push_back(x_(2));
-  }
-
-  results.push_back(x_(3));
-  results.push_back(x_(4));
-  return results;
-
-  // x_ = x_ + K * z_diff;
-  // x_(3) = atan2(sin(x_(3)), cos(x_(3)));
-  // P_ = P_ - K * S * K.transpose();
+  VectorXd state_x_ = x_ + K * z_diff;
+  state_x_(3) = atan2(sin(state_x_(3)), cos(state_x_(3)));
+  //update state mean and covariance matrix
+  State new_state;
+  new_state.x = state_x_(0);
+  new_state.y = state_x_(1);
+  new_state.v = state_x_(2);
+  new_state.yaw = state_x_(3);
+  new_state.yaw = atan2(sin(new_state.yaw), cos(new_state.yaw));
+  new_state.yawr = state_x_(4);
+  return new_state;
 }
 void UKF::UpdateGPS(const gpsData::ConstPtr &gps_data, geometry_msgs::PoseStamped &gps_pose)
 {
