@@ -32,22 +32,6 @@ sensor_msgs::PointCloud2 RVIZ::createPointCloud(MyPointCloud2D my_pc, string fra
     return pc2;
 }
 
-MyPointCloud2D ScanPoints::create(sensor_msgs::PointCloud msg)
-{
-    MyPointCloud2D scan_points;
-    MyPoint temp_pt;
-    for (int i = 0; i < msg.points.size(); ++i)
-    {
-        scan_points.ids.push_back(i);
-        scan_points.weights.push_back(1);
-        scan_points.distances.push_back(0);
-        temp_pt.x = msg.points[i].x;
-        temp_pt.y = msg.points[i].y;
-        scan_points.pts.push_back(temp_pt);
-    }
-    return scan_points;
-}
-
 vector<bool> Ramp::check(const State state)
 {
 

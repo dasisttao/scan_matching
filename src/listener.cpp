@@ -40,7 +40,6 @@ ICP icp;
 RVIZ rviz;
 Ramp ramp;
 MyMap my_map;
-ScanPoints scan_points;
 CoordTransform coord_transform;
 State state, icp_state;
 sensor_msgs::PointCloud2 pc2, map_pc;
@@ -58,6 +57,22 @@ enum MeasureState
   GPS
 };
 MeasureState measure_state;
+
+MyPointCloud2D createMyPointCloud(sensor_msgs::PointCloud msg)
+{
+  MyPointCloud2D scan_points;
+  MyPoint temp_pt;
+  for (int i = 0; i < msg.points.size(); ++i)
+  {
+    scan_points.ids.push_back(i);
+    scan_points.weights.push_back(1);
+    scan_points.distances.push_back(0);
+    temp_pt.x = msg.points[i].x;
+    temp_pt.y = msg.points[i].y;
+    scan_points.pts.push_back(temp_pt);
+  }
+  return scan_points;
+}
 
 void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr &gps_data, const autobox_out::ConstPtr &can_data)
 {
@@ -111,7 +126,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       pc = filter.filterLaserChannel(pc);
 
       //Create ScanPoints vector for better handling
-      MyPointCloud2D scans = scan_points.create(pc);
+      MyPointCloud2D scans = createMyPointCloud(pc);
 
       //------Algorithm Start-------
       //--1--Reducing ScanPoints

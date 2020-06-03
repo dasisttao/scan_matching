@@ -9,7 +9,6 @@
 #include <scan_match/var_defs.hpp>
 #include <scan_match/transform.hpp>
 
-
 using namespace std;
 class Timer
 {
@@ -31,12 +30,6 @@ public:
 
 private:
     CoordTransform coord_transform;
-};
-
-class ScanPoints
-{
-public:
-    MyPointCloud2D create(sensor_msgs::PointCloud msg);
 };
 
 class Ramp

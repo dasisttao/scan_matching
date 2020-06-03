@@ -10,6 +10,8 @@ add_library(
     src/scan_match/utils.cpp
     src/scan_match/transform.hpp
     src/scan_match/transform.cpp
+    src/scan_match/icp_methods.hpp
+    src/scan_match/icp_methods.cpp
     src/scan_match/var_defs.hpp
 
 )
