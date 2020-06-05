@@ -16,16 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   ukf_state_msg
   geodesy
 )
-
-# add_message_files(
-#   FILES
-#   State.msg
-# )
-
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
+find_package(Python2 COMPONENTS Development NumPy)
 
 catkin_package(
    CATKIN_DEPENDS roscpp rospy sensor_msgs std_msgs message_runtime ukf_state_msg geodesy
@@ -37,6 +28,7 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
+
 add_subdirectory(tools)
 add_subdirectory(src)
 

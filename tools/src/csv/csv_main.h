@@ -18,7 +18,7 @@ namespace WriteCSV
     {
         try
         {
-            csvfile csv("KalmanFilterState.csv"); // throws exceptions!
+            csvfile csv("src/icp_lokalisierung/scan_matching/csv_output/KalmanFilterState.csv"); // throws exceptions!
             csv << ukf_filter.x_(0) << ukf_filter.x_(1) << ukf_filter.x_(2) << ukf_filter.x_(3) << ukf_filter.x_(4) << endrow;
             csv << ukf_filter.P_(0, 0) << ukf_filter.P_(1, 0) << ukf_filter.P_(2, 0) << ukf_filter.P_(3, 0) << ukf_filter.P_(4, 0) << endrow;
             csv << ukf_filter.P_(0, 1) << ukf_filter.P_(1, 1) << ukf_filter.P_(2, 1) << ukf_filter.P_(3, 1) << ukf_filter.P_(4, 1) << endrow;
@@ -28,7 +28,7 @@ namespace WriteCSV
         }
         catch (const std::exception &ex)
         {
-            std::cout << "Exception was thrown: " << ex.what() << std::endl;
+            std::cout << "Irgendwas ist beim Schreiben schief gelaufen!: " << ex.what() << std::endl;
         }
     }
 } // namespace WriteCSV
@@ -38,7 +38,7 @@ namespace ReadCSV
 
     void kalmanCSV(UKF &ukf_filter)
     {
-        std::ifstream data("KalmanFilterState.csv");
+        std::ifstream data("src/icp_lokalisierung/scan_matching/csv_output/KalmanFilterState.csv");
         std::string line;
         std::vector<std::vector<std::string>> parsedCsv;
         while (std::getline(data, line))
@@ -56,7 +56,6 @@ namespace ReadCSV
 
         for (vector<string> strings : parsedCsv)
         {
-            cout << strings.size() << endl;
             if (col == 0)
             {
                 ukf_filter.x_(0) = stod(strings[0]);
@@ -107,8 +106,6 @@ namespace ReadCSV
             }
             col++;
         }
-        cout << ukf_filter.x_ << endl;
-        cout << ukf_filter.P_ << endl;
     }
 
 } // namespace ReadCSV

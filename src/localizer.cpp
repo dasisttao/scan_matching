@@ -24,7 +24,8 @@
 #include <csv/csv.h>
 #include <csv/csv_main.h>
 #include <scan_match/transform.hpp>
-#include <scan_match/debugging.hpp>
+#include <debugging/plausability.h>
+#include <debugging/plotter.h>
 
 using namespace sensor_msgs;
 using namespace message_filters;
@@ -44,6 +45,7 @@ ICP icp;
 RVIZ rviz;
 Ramp ramp;
 MyMap my_map;
+Plotter plotter;
 Plausability plausability;
 CoordTransform coord_transform;
 State state, icp_state;
@@ -91,8 +93,12 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     // readMapUTM(); // another map
     my_map.readMapParkhaus(map_pc, map_carpark);
 
-    //ReadCSV Kalman
-    ReadCSV::kalmanCSV(ukf_filter);
+    //Read last Kalman State if in park house
+    if (int(gps_data->status.Stat_Byte0_GPS_Mode) == 1)
+    {
+      ReadCSV::kalmanCSV(ukf_filter);
+    }
+    plotter.plottest();
 
     //Get Local Pose
     vector<double> local_pos = coord_transform.getLocalPoseFromGPS(gps_data, gps_pose);
