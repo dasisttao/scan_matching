@@ -50,7 +50,7 @@ Plausability plausability;
 CoordTransform coord_transform;
 State state, icp_state;
 sensor_msgs::PointCloud2 pc2, map_pc;
-geometry_msgs::PoseStamped gps_pose, pose_estimation;
+geometry_msgs::PoseStamped gps_pose, pose_estimation, pose_test;
 UKF ukf_filter;
 double time_us_;
 double time_start = 0;
@@ -81,6 +81,19 @@ MyPointCloud2D createMyPointCloud(sensor_msgs::PointCloud msg)
   return scan_points;
 }
 
+void callback_init_pose(const geometry_msgs::PoseWithCovarianceStamped &pose_in)
+{
+  tf::Quaternion q(
+      pose_in.pose.pose.orientation.x,
+      pose_in.pose.pose.orientation.y,
+      pose_in.pose.pose.orientation.z,
+      pose_in.pose.pose.orientation.w);
+  tf::Matrix3x3 m(q);
+  double roll, pitch, yaw;
+  m.getRPY(roll, pitch, yaw);
+  ukf_filter.x_ << pose_in.pose.pose.position.x, pose_in.pose.pose.position.y, 0, yaw, 0;
+}
+
 void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr &gps_data, const autobox_out::ConstPtr &can_data)
 {
 
@@ -98,7 +111,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     {
       ReadCSV::kalmanCSV(ukf_filter);
     }
-    plotter.plottest();
+    // plotter.plottest();
 
     //Get Local Pose
     vector<double> local_pos = coord_transform.getLocalPoseFromGPS(gps_data, gps_pose);
@@ -205,9 +218,10 @@ int main(int argc, char **argv)
   //Node Handling
   ros::init(argc, argv, "scan_matching_node");
   ros::NodeHandle nh;
-
+  //Subs
+  ros::Subscriber sub = nh.subscribe("/initialpose", 1000, callback_init_pose);
+  //Sync sub msgs
   message_filters::Subscriber<PointCloud2> point_cloud_sub(nh, "/as_tx/point_cloud", 10);
-  // message_filters::Subscriber<PoseStamped> pose_sub(nh, "vehicle_pose", 10); // Später einführen!
   message_filters::Subscriber<gpsData> gps_sub(nh, "/can_2_ros_gps", 10);
   message_filters::Subscriber<autobox_out> can_sub(nh, "/data_out", 10);
   typedef sync_policies::ApproximateTime<PointCloud2, gpsData, autobox_out> MySyncPolicy;
@@ -218,21 +232,29 @@ int main(int argc, char **argv)
   auto map_pub = nh.advertise<sensor_msgs::PointCloud2>("map_point_cloud", 30);
   auto pose_pub = nh.advertise<geometry_msgs::PoseStamped>("gps_pose", 30);
   auto pose_est_pub = nh.advertise<geometry_msgs::PoseStamped>("pose_estimated", 30);
+  auto pose_test_pub = nh.advertise<geometry_msgs::PoseStamped>("pose_test", 30);
   ros::Rate rate(60);
   while (ros::ok())
   {
-
+    //UTM
     posepubUTM.publish(result_output);
+    //Point Cloud Laser
     pc2.header.stamp = ros::Time::now();
     pc_pub.publish(pc2);
+    //Point Cloud Map
     map_pc.header.stamp = ros::Time::now();
     map_pub.publish(map_pc);
+    //GPS Pose
     gps_pose.header.stamp = ros::Time::now();
     gps_pose.header.frame_id = "ibeo_lux";
     pose_pub.publish(gps_pose);
+    //Estimated Pose
     pose_estimation.header.stamp = ros::Time::now();
     pose_estimation.header.frame_id = "ibeo_lux";
     pose_est_pub.publish(pose_estimation);
+
+    //Test pose
+    pose_test_pub.publish(pose_test);
     ros::spinOnce();
     rate.sleep();
   }
