@@ -26,6 +26,8 @@
 #include <scan_match/transform.hpp>
 #include <debugging/plausability.h>
 
+#include "myInit.h"
+
 using namespace sensor_msgs;
 using namespace message_filters;
 using namespace geometry_msgs;
@@ -37,20 +39,19 @@ using namespace ReadCSV;
 
 //Variablen
 bool init = false;
-bool initial_pose_needed = false;
-MyPointCloud2D map_carpark;
+
 Filter filter;
 Timer timer;
 ICP icp;
-RVIZ rviz;
+
 Ramp ramp;
-MyMap my_map;
+
 Plausability plausability;
 CoordTransform coord_transform;
-State state, icp_state;
-sensor_msgs::PointCloud2 pc2, map_pc;
-geometry_msgs::PoseStamped gps_pose, pose_estimation, pose_test;
-UKF ukf_filter;
+
+
+
+
 double time_us_;
 double time_start = 0;
 
@@ -97,6 +98,17 @@ void callback_init_pose(const geometry_msgs::PoseWithCovarianceStamped &pose_in)
       -0.014, 0, 0.05, 0, 0,
       0, 0, 0, 0, 0,
       0, 0, 0, 0, 0;
+  std::cout <<  " Initialized X:   "<<  pose_in.pose.pose.position.x << std::endl;
+  std::cout <<  " Initialized Y:   "<< pose_in.pose.pose.position.y << std::endl;
+  std::cout <<  " Initialized Yaw: "<< yaw << std::endl;
+
+  state.x = ukf_filter.x_(0);
+  state.y = ukf_filter.x_(1);
+  state.v = ukf_filter.x_(2);
+  state.yaw = ukf_filter.x_(3);
+  state.yawr = ukf_filter.x_(4);
+  //Display estimated pose on rviz (here it is inital pose)
+  rviz.displayEstimatedPose(state, pose_estimation);
   initial_pose_needed = false;
 }
 
@@ -108,10 +120,6 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
   if (!init)
   {
     init = true;
-    //Read map
-    // readMapUTM(); // another map
-    my_map.readMapParkhaus(map_pc, map_carpark);
-
     ukf_filter.time_us_ = point_cloud->header.stamp.toSec();
     time_start = point_cloud->header.stamp.toSec();
 
@@ -216,6 +224,9 @@ int main(int argc, char **argv)
   auto pose_est_pub = nh.advertise<geometry_msgs::PoseStamped>("pose_estimated", 30);
   auto pose_test_pub = nh.advertise<geometry_msgs::PoseStamped>("pose_test", 30);
   ros::Rate rate(60);
+
+  MYINIT myinit(nh,rate,map_pub);
+
   while (ros::ok())
   {
     //UTM
