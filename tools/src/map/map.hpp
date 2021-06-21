@@ -11,7 +11,7 @@ public:
     void readMapCrossroad(sensor_msgs::PointCloud2 &my_map, MyPointCloud2D &map_crossroad);
     void rotatePoint(double &x, double &y, double alpha);
     void readMapParkhaus(sensor_msgs::PointCloud2 &my_map, MyPointCloud2D &map_carpark);
-
+    void readRawData(sensor_msgs::PointCloud2 &map_pc, MyPointCloud2D &map_carpark,std::string map_path);
 private:
     CoordTransform coord_transform;
     RVIZ rviz;
@@ -72,6 +72,41 @@ void MyMap::readMapParkhaus(sensor_msgs::PointCloud2 &map_pc, MyPointCloud2D &ma
         map_carpark.ids.push_back(i);
 
         rotatePoint(x, y, -72.523); //+ gegen Uhrzeiger
+        map_pt.x = x;
+        map_pt.y = y;
+
+	
+        map_carpark.pts.push_back(map_pt);
+        map_carpark.weights.push_back(1);
+        map_carpark.distances.push_back(0);
+        i++;
+    }
+    map_pc = rviz.createPointCloud(map_carpark, "ibeo_lux", 1.0);
+}
+
+
+void MyMap::readRawData(sensor_msgs::PointCloud2 &map_pc, MyPointCloud2D &map_carpark,std::string map_path)
+{
+    if(map_carpark.ids.size()!=0){
+        std::cout<< "\n Clear the Old Map Data "<<std::endl;
+        map_carpark.ids.clear();
+        map_carpark.pts.clear();
+        map_carpark.weights.clear();
+        map_carpark.distances.clear();
+    }
+
+    double x, y;
+    MyPoint map_pt;
+
+    io::CSVReader<2> in2(map_path);
+    //Local X , Local Y
+    in2.read_header(io::ignore_extra_column, "x", "y");
+    int i = 0;
+    while (in2.read_row(x, y))
+    {
+        map_carpark.ids.push_back(i);
+
+        //rotatePoint(x, y, -72.523); //+ gegen Uhrzeiger
         map_pt.x = x;
         map_pt.y = y;
 
