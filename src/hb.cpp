@@ -100,10 +100,10 @@ void callback_init_pose(const geometry_msgs::PoseWithCovarianceStamped &pose_in)
   initial_pose_needed = false;
 }
 
-void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr &gps_data, const autobox_out::ConstPtr &can_data)
+void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::ConstPtr &can_data)
 {
 
-  double tnow = gps_data->header.stamp.toSec();
+  double tnow = point_cloud->header.stamp.toSec();
   double dt = tnow - ukf_filter.time_us_;
   if (!init)
   {
@@ -112,26 +112,9 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     // readMapUTM(); // another map
     my_map.readMapParkhaus(map_pc, map_carpark);
 
-    //Read last Kalman State if in park house
-    //This determines if car started in parkhaus or more common: in a place with no GPS
-    if (int(gps_data->status.Stat_Byte0_GPS_Mode) <= 2)
-    {
-      ReadCSV::kalmanCSV(ukf_filter);
-      initial_pose_needed = true;
-    }else{
-      initial_pose_needed = false;
-    }
-    // plotter.plottest();
+    ukf_filter.time_us_ = point_cloud->header.stamp.toSec();
+    time_start = point_cloud->header.stamp.toSec();
 
-    //Get Local Pose
-    vector<double> local_pos = coord_transform.getLocalPoseFromGPS(gps_data, gps_pose);
-
-    //Setup timestamp
-    ukf_filter.time_us_ = gps_data->header.stamp.toSec();
-    time_start = gps_data->header.stamp.toSec();
-
-    //Set initial state
-    ukf_filter.x_ << local_pos[0], local_pos[1], gps_data->ins_vh.In_VXH, local_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
     measure_state = MeasureState::Odo;
     return;
   }
@@ -158,8 +141,6 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
   rviz.outputLocalizationResult(state, result_output);
 
   //Use localization method depending on GPS signal quality
-  if (int(gps_data->status.Stat_Byte0_GPS_Mode) < 4)
-  {
     vector<bool> on_ramp = ramp.check(state);
     if (measure_state == MeasureState::Laser)
     {
@@ -192,7 +173,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       ukf_filter.UpdateLaser(icp_state);
 
       //Plausability - First Odo, then Laser, because State is getting changed on Laser Update
-      plausability.times.push_back((gps_data->header.stamp.toSec() - time_start));
+      plausability.times.push_back((can_data->header.stamp.toSec() - time_start));
       plausability.setStateOdo(ukf_filter.UpdateOdometriePlausability(can_data, on_ramp));
       plausability.setStateICP(ukf_filter);
 
@@ -209,18 +190,6 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
       ukf_filter.UpdateOdometrie(can_data, on_ramp);
       measure_state = MeasureState::Laser;
     }
-  }
-  else if (int(gps_data->status.Stat_Byte0_GPS_Mode) >= 4)
-  {
-    //Set state directly from GPS Pose
-    vector<double> local_pos = coord_transform.getLocalPoseFromGPS(gps_data, gps_pose);
-    ukf_filter.x_ << local_pos[0], local_pos[1], gps_data->ins_vh.In_VXH, local_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
-
-    // // For using GPS in Kalman Filter
-    // ukf_filter.Prediction(dt);
-    // ukf_filter.UpdateGPS(gps_data, gps_pose);
-    measure_state = MeasureState::GPS;
-  }
 
   //Plausability Checks
   plausability.deltaOdoICP();
@@ -237,15 +206,13 @@ int main(int argc, char **argv)
   ros::Subscriber sub = nh.subscribe("/initialpose", 1000, callback_init_pose);
   //Sync sub msgs
   message_filters::Subscriber<PointCloud2> point_cloud_sub(nh, "/as_tx/point_cloud", 10);
-  message_filters::Subscriber<gpsData> gps_sub(nh, "/can_2_ros_gps", 10);
   message_filters::Subscriber<autobox_out> can_sub(nh, "/data_out", 10);
-  typedef sync_policies::ApproximateTime<PointCloud2, gpsData, autobox_out> MySyncPolicy;
-  Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), point_cloud_sub, gps_sub, can_sub);
-  sync.registerCallback(boost::bind(&callback, _1, _2, _3));
+  typedef sync_policies::ApproximateTime<PointCloud2, autobox_out> MySyncPolicy;
+  Synchronizer<MySyncPolicy> sync(MySyncPolicy(10), point_cloud_sub, can_sub);
+  sync.registerCallback(boost::bind(&callback, _1, _2));
   auto posepubUTM = nh.advertise<geometry_msgs::PoseStamped>("VehiclePoseFusionUTM", 10);
   auto pc_pub = nh.advertise<sensor_msgs::PointCloud2>("laser_point_cloud", 30);
   auto map_pub = nh.advertise<sensor_msgs::PointCloud2>("map_point_cloud", 30);
-  auto pose_pub = nh.advertise<geometry_msgs::PoseStamped>("gps_pose", 30);
   auto pose_est_pub = nh.advertise<geometry_msgs::PoseStamped>("pose_estimated", 30);
   auto pose_test_pub = nh.advertise<geometry_msgs::PoseStamped>("pose_test", 30);
   ros::Rate rate(60);
@@ -259,10 +226,6 @@ int main(int argc, char **argv)
     //Point Cloud Map
     map_pc.header.stamp = ros::Time::now();
     map_pub.publish(map_pc);
-    //GPS Pose
-    gps_pose.header.stamp = ros::Time::now();
-    gps_pose.header.frame_id = "ibeo_lux";
-    pose_pub.publish(gps_pose);
     //Estimated Pose
     pose_estimation.header.stamp = ros::Time::now();
     pose_estimation.header.frame_id = "ibeo_lux";
