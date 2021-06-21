@@ -23,9 +23,9 @@ public:
     sensor_msgs::PointCloud filterLaserChannel(sensor_msgs::PointCloud pc);
 
 public:
-    float longi_max = 75;
-    float longi_min = -75;
-    float lateral_max = 75;
-    float lateral_min = -75;
-    float map_threshold = 75;
+    float longi_max = 85;
+    float longi_min = -85;
+    float lateral_max = 85;
+    float lateral_min = -85;
+    float map_threshold = 85;
 };

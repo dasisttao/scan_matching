@@ -9,7 +9,7 @@
 enum VerwerfungsMethode
 {
     constantValue,
-    constantAndRisingDistnace
+    constantAndRisingDistance
 };
 
 enum GewichtungsMethode

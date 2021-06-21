@@ -8,7 +8,7 @@ MyPointCloud2D Verwerfung::selectVewerfung(VerwerfungsMethode verwerfungs_method
     case VerwerfungsMethode::constantValue:
         output = constantValue(map_corrs, scans, map_carpark);
         break;
-    case VerwerfungsMethode::constantAndRisingDistnace:
+    case VerwerfungsMethode::constantAndRisingDistance:
         output = constantAndRisingDistance(map_corrs, scans, map_carpark, state);
         break;
     }

@@ -22,7 +22,6 @@
   <build_depend>ukf</build_depend>
   <build_depend>map</build_depend>
   <build_depend>debugging</build_depend>
-  <build_depend>Python2</build_depend>
   <build_export_depend>message_filters</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>rospy</build_export_depend>
@@ -34,7 +33,6 @@
   <build_export_depend>ukf</build_export_depend>
   <build_export_depend>map</build_export_depend>
   <build_export_depend>debugging</build_export_depend>
-  <build_export_depend>Python2</build_export_depend>
   <exec_depend>message_filters</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>
@@ -47,7 +45,6 @@
   <exec_depend>ukf</exec_depend>
   <exec_depend>map</exec_depend>
   <exec_depend>debugging</exec_depend>
-  <exec_depend>Python2</exec_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

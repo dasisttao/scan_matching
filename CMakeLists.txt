@@ -16,7 +16,6 @@ find_package(catkin REQUIRED COMPONENTS
   ukf_state_msg
   geodesy
 )
-find_package(Python2 COMPONENTS Development NumPy)
 
 catkin_package(
    CATKIN_DEPENDS roscpp rospy sensor_msgs std_msgs message_runtime ukf_state_msg geodesy

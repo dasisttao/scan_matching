@@ -25,7 +25,6 @@
 #include <csv/csv_main.h>
 #include <scan_match/transform.hpp>
 #include <debugging/plausability.h>
-#include <debugging/plotter.h>
 
 using namespace sensor_msgs;
 using namespace message_filters;
@@ -38,6 +37,7 @@ using namespace ReadCSV;
 
 //Variablen
 bool init = false;
+bool initial_pose_needed = false;
 MyPointCloud2D map_carpark;
 Filter filter;
 Timer timer;
@@ -45,7 +45,6 @@ ICP icp;
 RVIZ rviz;
 Ramp ramp;
 MyMap my_map;
-Plotter plotter;
 Plausability plausability;
 CoordTransform coord_transform;
 State state, icp_state;
@@ -81,6 +80,7 @@ MyPointCloud2D createMyPointCloud(sensor_msgs::PointCloud msg)
   return scan_points;
 }
 
+
 void callback_init_pose(const geometry_msgs::PoseWithCovarianceStamped &pose_in)
 {
   tf::Quaternion q(
@@ -92,6 +92,12 @@ void callback_init_pose(const geometry_msgs::PoseWithCovarianceStamped &pose_in)
   double roll, pitch, yaw;
   m.getRPY(roll, pitch, yaw);
   ukf_filter.x_ << pose_in.pose.pose.position.x, pose_in.pose.pose.position.y, 0, yaw, 0;
+  ukf_filter.P_ << 10, 0.03, -0.014, 0, 0,
+      0.03, 10, -0.01, 0, 0,
+      -0.014, 0, 0.05, 0, 0,
+      0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0;
+  initial_pose_needed = false;
 }
 
 void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr &gps_data, const autobox_out::ConstPtr &can_data)
@@ -107,9 +113,13 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     my_map.readMapParkhaus(map_pc, map_carpark);
 
     //Read last Kalman State if in park house
-    if (int(gps_data->status.Stat_Byte0_GPS_Mode) == 1)
+    //This determines if car started in parkhaus or more common: in a place with no GPS
+    if (int(gps_data->status.Stat_Byte0_GPS_Mode) <= 2)
     {
       ReadCSV::kalmanCSV(ukf_filter);
+      initial_pose_needed = true;
+    }else{
+      initial_pose_needed = false;
     }
     // plotter.plottest();
 
@@ -124,6 +134,11 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const gpsData::ConstPtr 
     ukf_filter.x_ << local_pos[0], local_pos[1], gps_data->ins_vh.In_VXH, local_pos[2], -gps_data->rateshorizontal.RZH * M_PI / 180.0;
     measure_state = MeasureState::Odo;
     return;
+  }
+  //Return (not use Algorithm) if initial pose is needed (e.g. because started in parkhaus)
+  if(initial_pose_needed == true){
+	ukf_filter.time_us_ = tnow;
+  return;
   }
   //Save last state in csv
   WriteCSV::kalmanCSV(ukf_filter);

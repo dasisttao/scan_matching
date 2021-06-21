@@ -74,6 +74,8 @@ void MyMap::readMapParkhaus(sensor_msgs::PointCloud2 &map_pc, MyPointCloud2D &ma
         rotatePoint(x, y, -72.523); //+ gegen Uhrzeiger
         map_pt.x = x;
         map_pt.y = y;
+
+	
         map_carpark.pts.push_back(map_pt);
         map_carpark.weights.push_back(1);
         map_carpark.distances.push_back(0);
