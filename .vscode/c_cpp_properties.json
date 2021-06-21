@@ -6,12 +6,14 @@
                 "limitSymbolsToIncludedHeaders": true
             },
             "includePath": [
-                "/home/umut/catkin_ws/devel/include/**",
-                "/opt/ros/kinetic/include/**",
-                "/home/umut/catkin_ws/src/localization_with_artrack_cv/include/**",
-                "/home/umut/catkin_ws/src/scan_matching/**",
+                "/home/tao/catkin_ws/devel/include/**",
+                "/opt/ros/noetic/include/**",
+                "/home/tao/catkin_ws/src/localization_with_artrack_cv/include/**",
+                "/home/tao/catkin_ws/src/scan_matching/**",
                 "/usr/include/**",
-                "/home/umut/catkin_ws/src/ukf_state_msg/include/**"
+                "/home/tao/catkin_ws/src/ukf_state_msg/include/**",
+                "/home/tao/catkin_ws/src/icp_lokalisierung/scan_matching/tools/src/**",
+                "/home/tao/catkin_ws/src/icp_lokalisierung/geodesy/include/**"
             ],
             "name": "ROS",
             "intelliSenseMode": "gcc-x64",
