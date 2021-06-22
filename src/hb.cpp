@@ -27,6 +27,7 @@
 #include <debugging/plausability.h>
 
 #include "myInit.h"
+#include "Floor.h"
 
 using namespace sensor_msgs;
 using namespace message_filters;
@@ -226,7 +227,8 @@ int main(int argc, char **argv)
   ros::Rate rate(60);
 
   MYINIT myinit(nh,rate,map_pub);
-
+  FLOOR floor(nh, FLOOR::CarOnFloor::E0);
+  floor.printFloor();
   while (ros::ok())
   {
     //UTM
@@ -242,6 +244,7 @@ int main(int argc, char **argv)
     pose_estimation.header.frame_id = "ibeo_lux";
     pose_est_pub.publish(pose_estimation);
 
+    floor.check_floor(state);
     //Test pose
     pose_test_pub.publish(pose_test);
     ros::spinOnce();
