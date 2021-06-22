@@ -5,3 +5,51 @@ position_y: 50
 v:          0
 yaw:        2.9670597
 yawr:       0
+
+
+
+# Bestimmen das Fenster, wo sich Ebene 0 und Ebne 1 wechseln
+# Wir nehmen zuerst an, dass Fahrzeug nicht in dem Fester rein fahren und wider rückfahren
+# Das heisst, wenn das Auto auf Ebene 0 ist und das Fenster drin fahren, dann Fahrzeug wird auf Ebne 1 wechseln.
+
+# E0 -> E1 Fenster
+E0_E1_x1: 70
+E0_E1_x2: 80
+E0_E1_y1: 45
+E0_E1_y2: 55
+
+# E1 -> R10 Fenster
+E1_R10_x1: 35
+E1_R10_x2: 48
+E1_R10_y1: 72
+E1_R10_y2: 83
+
+# R10 -> E0 Fenster
+R10_E0_x1: 90
+R10_E0_x2: 100
+R10_E0_y1: 40
+R10_E0_y2: 48
+
+# E1 -> R12 Fenster
+E1_R12_x1: 42
+E1_R12_x2: 50
+E1_R12_y1: 50
+E1_R12_y2: 58
+
+# R12 -> E2 Fenster
+R12_E2_x1: 32
+R12_E2_x2: 40
+R12_E2_y1: 75
+R12_E2_y2: 85
+
+# E2 -> R21 Fenster
+E2_R21_x1: 50
+E2_R21_x2: 58
+E2_R21_y1: 54
+E2_R21_y2: 64
+
+# R21 -> E1 Fenster
+R21_E1_x1: 50
+R21_E1_x2: 58
+R21_E1_y1: 76
+R21_E1_y2: 85
