@@ -22,7 +22,7 @@ public:
 private:
     const size_t number_of_iterations = 5;
     const size_t number_of_results = 1;
-    const VerwerfungsMethode verwerfungs_methode = VerwerfungsMethode::constantValue;
+    const VerwerfungsMethode verwerfungs_methode = VerwerfungsMethode::sigmaFilter;
     const GewichtungsMethode gewichtungs_methode = GewichtungsMethode::applyNothing;
 
 private:

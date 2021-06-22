@@ -1,5 +1,5 @@
 #include <scan_match/icp_methods.hpp>
-
+#include <vector>
 MyPointCloud2D Verwerfung::selectVewerfung(VerwerfungsMethode verwerfungs_methode, MyPointCloud2D &map_corrs, const MyPointCloud2D &scans, const MyPointCloud2D &map_carpark, const State &state)
 {
     MyPointCloud2D output;
@@ -11,6 +11,8 @@ MyPointCloud2D Verwerfung::selectVewerfung(VerwerfungsMethode verwerfungs_method
     case VerwerfungsMethode::constantAndRisingDistance:
         output = constantAndRisingDistance(map_corrs, scans, map_carpark, state);
         break;
+    case VerwerfungsMethode::sigmaFilter:
+        output = sigmaFilter(map_corrs, scans, map_carpark);
     }
     return output;
 }
@@ -199,4 +201,75 @@ void Gewichtung::setZeroIfTwoCorrespondings(MyPointCloud2D &scans)
         sum_weights += scans.weights[i];
     }
     normalize(scans, sum_weights);
+}
+
+
+
+MyPointCloud2D Verwerfung::sigmaFilter(MyPointCloud2D &map_corrs, const MyPointCloud2D &scans, const MyPointCloud2D &map_carpark)
+{
+    MyPointCloud2D temp_scans;
+    MyPointCloud2D temp_map_corrs;
+    MyPoint temp_pt;
+    int index;
+
+    auto med{Median(map_corrs.distances)};
+    
+    auto sigmad{1.4826 * MAD(map_corrs.distances)};
+    std::cout << sigmad << std::endl;
+    //Removing correspondencies that are too far apart
+    for (size_t i = 0; i < scans.distances.size(); i++)
+    {
+        if (abs(scans.distances[i] -med) < 3*sigmad)
+        {
+            temp_scans.distances.push_back(scans.distances[i]);
+            temp_scans.ids.push_back(i);
+            temp_scans.weights.push_back(1);
+            temp_pt.x = scans.pts[i].x;
+            temp_pt.y = scans.pts[i].y;
+            temp_scans.pts.push_back(temp_pt);
+
+            temp_map_corrs.distances.push_back(map_corrs.distances[i]);
+            temp_map_corrs.ids.push_back(i);
+            temp_map_corrs.weights.push_back(1);
+            index = scans.ids[i];
+            temp_pt.x = map_carpark.pts[index].x;
+            temp_pt.y = map_carpark.pts[index].y;
+            temp_map_corrs.pts.push_back(temp_pt);
+        }
+    }
+    map_corrs = temp_map_corrs;
+    return temp_scans;
+}
+
+
+
+float Median(const std::vector<float>& v) {
+  std::vector<float> vv(v.size());
+  for (int i = 0; i < v.size(); i++) {
+    vv[i] = v[i];
+  }
+  size_t size = vv.size();
+  if (size == 0){
+    return 0;  // Undefined, really.
+  }
+  else{
+      sort(vv.begin(), vv.end());
+      if (size % 2 == 0){
+        return (vv[size / 2 - 1] + vv[size / 2]) / 2;
+      }
+      else {
+        return vv[size / 2];
+      }
+  }
+}
+
+
+float MAD(const std::vector<float>& v) {
+  auto med{Median(v)};
+  std::vector<float> dmed;
+  for (int i = 0; i < v.size(); i++) {
+      dmed.push_back(abs(v[i] - med));
+  }
+  auto mad{Median(dmed)};
+  return mad;
 }
