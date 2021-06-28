@@ -15,17 +15,23 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   ukf_state_msg
   geodesy
+
+  pcl_ros
+  pcl_conversions
+  PCL REQUIRED
 )
 
 catkin_package(
    CATKIN_DEPENDS roscpp rospy sensor_msgs std_msgs message_runtime ukf_state_msg geodesy
 )
 
-
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
 
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
 )
 
 add_subdirectory(tools)
