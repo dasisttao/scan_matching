@@ -79,7 +79,13 @@ sensor_msgs::PointCloud Filter::filterLaserChannel(sensor_msgs::PointCloud pc)
 
     for (int i = 0; i < pc.channels[0].values.size(); i++)
     {
-        if (! ((pc.channels[0].values[i] == 0) || (pc.channels[0].values[i] == 4) ) )
+        if (! (
+                    (pc.channels[0].values[i] == 0) 
+                ||  (pc.channels[0].values[i] == 4) 
+                ||  (pc.channels[0].values[i] == 5) 
+                ||  (pc.channels[0].values[i] == 6) 
+              ) 
+            )
         {
             channel.values.push_back(pc.channels[0].values[i]);
             new_pc.points.push_back(pc.points[i]);
