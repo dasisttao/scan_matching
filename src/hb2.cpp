@@ -195,7 +195,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
   return;
   }
   //Save last state in csv
-  WriteCSV::kalmanCSV(ukf_filter);
+  // WriteCSV::kalmanCSV(ukf_filter);
   //Setup current state for ICP Algorithm
   state.x = ukf_filter.x_(0);
   state.y = ukf_filter.x_(1);
@@ -204,7 +204,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
   state.yawr = ukf_filter.x_(4);
 
   //Plausability
-  plausability.setState(state);
+  // plausability.setState(state);
 
   //Display estimated pose on rviz
   rviz.displayEstimatedPose(state, pose_estimation);
@@ -237,13 +237,11 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
       pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source(new pcl::PointCloud<pcl::PointXYZ>);
       saveMyPointCloudtoPCLXYZ(scans,cloud_source);
 
-
       //--3--Reduce points in map
       MyPointCloud2D map_filt = filter.reduceMap(map_carpark, state);
 
       pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_target(new pcl::PointCloud<pcl::PointXYZ>);
       saveMyPointCloudtoPCLXYZ(map_filt,cloud_target);
-
 
       // //--4--ICP Algorithmen
       // scans = icp.mainAlgorithm(map_filt, scans, state, icp_state, rotM);
@@ -253,27 +251,26 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
 	    my_icp.setInputTarget(cloud_target);
       my_icp.setMaxCorrespondenceDistance (1);
       my_icp.setMaximumIterations (10);
+      my_icp.setTransformationEpsilon(1e-6);
+      my_icp.setEuclideanFitnessEpsilon (0.0001);
 
       pcl::PointCloud<pcl::PointXYZ> Final;
 	    my_icp.align(Final);
-      std::cout << "has converged:" << my_icp.hasConverged() << " score: " <<
-      my_icp.getFitnessScore() << std::endl;
-      std::cout << my_icp.getFinalTransformation() << std::endl;
+      // std::cout << "has converged:" << my_icp.hasConverged() << " score: " <<
+      // my_icp.getFitnessScore() << std::endl;
+      // std::cout << my_icp.getFinalTransformation() << std::endl;
 
       scans = savePCLXYZtoMyPointCloud(Final);
-
       Eigen::Matrix4f final_H = my_icp.getFinalTransformation();
-
       icp_state = calcNewState(state,final_H);
-      
 
       //Update UKF Laser
       ukf_filter.UpdateLaser(icp_state);
 
       //Plausability - First Odo, then Laser, because State is getting changed on Laser Update
-      plausability.times.push_back((can_data->header.stamp.toSec() - time_start));
-      plausability.setStateOdo(ukf_filter.UpdateOdometriePlausability(can_data, on_ramp));
-      plausability.setStateICP(ukf_filter);
+      // plausability.times.push_back((can_data->header.stamp.toSec() - time_start));
+      // plausability.setStateOdo(ukf_filter.UpdateOdometriePlausability(can_data, on_ramp));
+      // plausability.setStateICP(ukf_filter);
 
       //!!!For RVIZ !!! NOTE: comment this out on release versions to save resources
       map_pc = rviz.createPointCloud(map_filt, "ibeo_lux", 1.0);
@@ -290,7 +287,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
     }
 
   //Plausability Checks
-  plausability.deltaOdoICP();
+  // plausability.deltaOdoICP();
 
   ukf_filter.time_us_ = tnow;
 }
@@ -312,7 +309,7 @@ int main(int argc, char **argv)
   auto pc_pub = nh.advertise<sensor_msgs::PointCloud2>("laser_point_cloud", 30);
   auto map_pub = nh.advertise<sensor_msgs::PointCloud2>("map_point_cloud", 30);
   auto pose_est_pub = nh.advertise<geometry_msgs::PoseStamped>("pose_estimated", 30);
-  auto pose_test_pub = nh.advertise<geometry_msgs::PoseStamped>("pose_test", 30);
+  // auto pose_test_pub = nh.advertise<geometry_msgs::PoseStamped>("pose_test", 30);
   ros::Rate rate(60);
 
   MYINIT myinit(nh,rate,map_pub);
@@ -335,7 +332,7 @@ int main(int argc, char **argv)
 
     floor.check_floor(state);
     //Test pose
-    pose_test_pub.publish(pose_test);
+    // pose_test_pub.publish(pose_test);
     ros::spinOnce();
     rate.sleep();
   }
