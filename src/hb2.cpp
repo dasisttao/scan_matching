@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <iostream>
+#include <fstream>
 #include <std_msgs/Header.h>
 #include <ukf_state_msg/State.h>
 #include <ukf/ukf.h>
@@ -31,6 +32,8 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/registration/icp.h>  
+
+#include <chrono>
 using namespace sensor_msgs;
 using namespace message_filters;
 using namespace geometry_msgs;
@@ -39,6 +42,12 @@ using namespace ros_can_gps_msg;
 using namespace Model_Development_bridge;
 using namespace WriteCSV;
 using namespace ReadCSV;
+
+
+int64_t MessZeit {0};
+size_t CountMess {0};
+
+std::vector<int64_t> MessZeit_V;
 
 //Variablen
 bool init = false;
@@ -246,23 +255,34 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
       // //--4--ICP Algorithmen
       // scans = icp.mainAlgorithm(map_filt, scans, state, icp_state, rotM);
 
+      
+      
       pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> my_icp;
       my_icp.setInputSource(cloud_source);
 	    my_icp.setInputTarget(cloud_target);
       my_icp.setMaxCorrespondenceDistance (1);
-      my_icp.setMaximumIterations (10);
+      my_icp.setMaximumIterations (5);
       my_icp.setTransformationEpsilon(1e-6);
       my_icp.setEuclideanFitnessEpsilon (0.0001);
 
+      std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
       pcl::PointCloud<pcl::PointXYZ> Final;
 	    my_icp.align(Final);
       // std::cout << "has converged:" << my_icp.hasConverged() << " score: " <<
       // my_icp.getFitnessScore() << std::endl;
       // std::cout << my_icp.getFinalTransformation() << std::endl;
 
+
       scans = savePCLXYZtoMyPointCloud(Final);
       Eigen::Matrix4f final_H = my_icp.getFinalTransformation();
       icp_state = calcNewState(state,final_H);
+
+
+      std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
+      MessZeit_V.push_back(std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count());
+      std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+
 
       //Update UKF Laser
       ukf_filter.UpdateLaser(icp_state);
@@ -336,6 +356,11 @@ int main(int argc, char **argv)
     ros::spinOnce();
     rate.sleep();
   }
-
+  std::ofstream myfile;
+      myfile.open ("example.csv");
+      for (auto i=0; i< MessZeit_V.size(); i++){
+        myfile << std::to_string(MessZeit_V[i]) << "\n";
+      }
+      myfile.close();
   return 0;
 }

@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <iostream>
+#include <fstream>
 #include <std_msgs/Header.h>
 #include <ukf_state_msg/State.h>
 #include <ukf/ukf.h>
@@ -29,6 +30,8 @@
 #include "myInit.h"
 #include "Floor.h"
 
+
+#include <chrono>
 using namespace sensor_msgs;
 using namespace message_filters;
 using namespace geometry_msgs;
@@ -37,7 +40,7 @@ using namespace ros_can_gps_msg;
 using namespace Model_Development_bridge;
 using namespace WriteCSV;
 using namespace ReadCSV;
-
+std::vector<int64_t> MessZeit_V;
 //Variablen
 bool init = false;
 
@@ -175,9 +178,16 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
       //--3--Reduce points in map
       MyPointCloud2D map_filt = filter.reduceMap(map_carpark, state);
 
+      std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
+
       // //--4--ICP Algorithmen
       scans = icp.mainAlgorithm(map_filt, scans, state, icp_state, rotM);
 
+      std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+      MessZeit_V.push_back(std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count());
+      
+      std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
       //Update UKF Laser
       ukf_filter.UpdateLaser(icp_state);
 
@@ -250,6 +260,11 @@ int main(int argc, char **argv)
     ros::spinOnce();
     rate.sleep();
   }
-
+  std::ofstream myfile;
+      myfile.open ("example2.csv");
+      for (auto i=0; i< MessZeit_V.size(); i++){
+        myfile << std::to_string(MessZeit_V[i]) << "\n";
+      }
+      myfile.close();
   return 0;
 }

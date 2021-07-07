@@ -181,11 +181,11 @@ void callback_pcl(const PointCloud2::ConstPtr &point_cloud){
 
   icp.setMaxCorrespondenceDistance (1);
   // // Set the maximum number of iterations (criterion 1)
-  icp.setMaximumIterations (10);
+  icp.setMaximumIterations (2);
   // // Set the transformation epsilon (criterion 2)
-  // icp.setTransformationEpsilon (1e-8);
+  icp.setTransformationEpsilon (0.01);
   // // Set the euclidean distance difference epsilon (criterion 3)
-  // icp.setEuclideanFitnessEpsilon (1);
+  icp.setEuclideanFitnessEpsilon (1);
   
   pcl::PointCloud<pcl::PointXYZ> Final;
 	icp.align(Final);
