@@ -150,7 +150,7 @@ class FLOOR{
           caronfloor = CarOnFloor::R21;
           printFloor();
           std::cout << "\n change map from map 4 E2 to map 5 R21\n";     
-          my_map.readRawData(map_pc, map_carpark,"src/icp_lokalisierung/scan_matching/map/map_Elphi_R21_Bauplan_reduced.csv"); 
+          my_map.readRawData(map_pc, map_carpark,"src/icp_lokalisierung/scan_matching/map/map_Elphi_R21.csv"); 
         }
     }
     else if(caronfloor == CarOnFloor::R21){
