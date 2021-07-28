@@ -32,6 +32,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/registration/icp.h>  
+#include <pcl/filters/voxel_grid.h>
 
 #include <chrono>
 using namespace sensor_msgs;
@@ -245,6 +246,13 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
 
       pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source(new pcl::PointCloud<pcl::PointXYZ>);
       saveMyPointCloudtoPCLXYZ(scans,cloud_source);
+      // std::cout << "Before Filter Size:" << cloud_source->size()<< std::endl;
+
+      pcl::VoxelGrid<pcl::PointXYZ> sor;
+      sor.setInputCloud (cloud_source);
+      sor.setLeafSize (0.01f, 0.01f, 5.0f);
+      sor.filter (*cloud_source);
+      // std::cout << "After Filter Size:" << cloud_source->size()<< std::endl;
 
       //--3--Reduce points in map
       MyPointCloud2D map_filt = filter.reduceMap(map_carpark, state);
@@ -254,8 +262,6 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
 
       // //--4--ICP Algorithmen
       // scans = icp.mainAlgorithm(map_filt, scans, state, icp_state, rotM);
-
-      
       
       pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> my_icp;
       my_icp.setInputSource(cloud_source);
@@ -263,7 +269,7 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
       my_icp.setMaxCorrespondenceDistance (1);
       my_icp.setMaximumIterations (5);
       my_icp.setTransformationEpsilon(1e-6);
-      my_icp.setEuclideanFitnessEpsilon (0.0001);
+      my_icp.setEuclideanFitnessEpsilon (0.001);
 
       std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
       pcl::PointCloud<pcl::PointXYZ> Final;
@@ -272,20 +278,26 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
       // my_icp.getFitnessScore() << std::endl;
       // std::cout << my_icp.getFinalTransformation() << std::endl;
 
-
       scans = savePCLXYZtoMyPointCloud(Final);
       Eigen::Matrix4f final_H = my_icp.getFinalTransformation();
       icp_state = calcNewState(state,final_H);
 
+      double x_diff = icp_state.x - state.x;
+      double y_diff = icp_state.y - state.y;
 
-      std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-
-      MessZeit_V.push_back(std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count());
-      std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
-
-
-      //Update UKF Laser
-      ukf_filter.UpdateLaser(icp_state);
+      if( ( abs(x_diff)<0.02 ) && ( abs(y_diff) < 0.02 ) )
+      {
+        // std::cout << "Maybe we could just use Odo" << std::endl;
+         ukf_filter.UpdateOdometrie(can_data, on_ramp);
+      }
+      else
+      {
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        MessZeit_V.push_back(std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count());
+        // std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+        //Update UKF Laser
+        ukf_filter.UpdateLaser(icp_state);
+      }
 
       //Plausability - First Odo, then Laser, because State is getting changed on Laser Update
       // plausability.times.push_back((can_data->header.stamp.toSec() - time_start));
