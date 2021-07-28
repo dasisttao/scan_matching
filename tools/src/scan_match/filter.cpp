@@ -81,6 +81,7 @@ sensor_msgs::PointCloud Filter::filterLaserChannel(sensor_msgs::PointCloud pc)
     {
         if (! (
                     (pc.channels[0].values[i] == 0) 
+                ||  (pc.channels[0].values[i] == 3) 
                 ||  (pc.channels[0].values[i] == 4) 
                 ||  (pc.channels[0].values[i] == 5) 
                 ||  (pc.channels[0].values[i] == 6) 
