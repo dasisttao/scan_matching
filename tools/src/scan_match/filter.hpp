@@ -18,6 +18,8 @@ class Filter
 public:
     Filter() = default;
     MyPointCloud2D getScanPointsWithinThreshold(MyPointCloud2D scans);
+    MyPointCloud2D getScanPointsWithinThreshold_param(MyPointCloud2D scans, float longiMax, float longiMin, float lateralMax, float lateralMIN);
+    MyPointCloud2D getScanPointsWithinThreshold_param(MyPointCloud2D scans, float longiMax, float longiMin, float lateralMax1, float lateralMIN1, float lateralMax2, float lateralMIN2);
     Matrix2d allignScanPoints(MyPointCloud2D &scans, const State &state);
     MyPointCloud2D reduceMap(MyPointCloud2D map_carpark, const State &state);
     sensor_msgs::PointCloud filterLaserChannel(sensor_msgs::PointCloud pc);

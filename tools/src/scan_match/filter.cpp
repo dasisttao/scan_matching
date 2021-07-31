@@ -25,6 +25,56 @@ MyPointCloud2D Filter::getScanPointsWithinThreshold(MyPointCloud2D scans)
     return scans_filt;
 }
 
+MyPointCloud2D Filter::getScanPointsWithinThreshold_param(MyPointCloud2D scans, float longiMax, float longiMin, float lateralMax, float lateralMIN)
+{
+    MyPointCloud2D scans_filt;
+    MyPoint temp_pt;
+    for (int i = 0; i < scans.pts.size(); i++)
+    {
+        if (scans.pts[i].x < longiMax && scans.pts[i].x > longiMin)
+        {
+            if (scans.pts[i].y < lateralMax && scans.pts[i].y > lateralMIN)
+            {
+                scans_filt.distances.push_back(scans.distances[i]);
+                scans_filt.ids.push_back(scans.ids[i]);
+                temp_pt.x = scans.pts[i].x;
+                temp_pt.y = scans.pts[i].y;
+                scans_filt.pts.push_back(temp_pt);
+                scans_filt.weights.push_back(scans.weights[i]);
+            }
+        }
+    }
+    return scans_filt;
+}
+
+
+// filter 2 ares, which has the same x value area.
+
+MyPointCloud2D Filter::getScanPointsWithinThreshold_param(MyPointCloud2D scans, float longiMax, float longiMin, float lateralMax1, float lateralMIN1, float lateralMax2, float lateralMIN2)
+{
+    MyPointCloud2D scans_filt;
+    MyPoint temp_pt;
+    for (int i = 0; i < scans.pts.size(); i++)
+    {
+        if (scans.pts[i].x < longiMax && scans.pts[i].x > longiMin)
+        {
+            if( (scans.pts[i].y < lateralMax1 && scans.pts[i].y > lateralMIN1) || ((scans.pts[i].y < lateralMax2 && scans.pts[i].y > lateralMIN2)) )
+            {
+                scans_filt.distances.push_back(scans.distances[i]);
+                scans_filt.ids.push_back(scans.ids[i]);
+                temp_pt.x = scans.pts[i].x;
+                temp_pt.y = scans.pts[i].y;
+                scans_filt.pts.push_back(temp_pt);
+                scans_filt.weights.push_back(scans.weights[i]);
+            }
+        }
+    }
+    return scans_filt;
+}
+
+
+
+
 Matrix2d Filter::allignScanPoints(MyPointCloud2D &scans, const State &state)
 {
     Matrix2d rot_M;
