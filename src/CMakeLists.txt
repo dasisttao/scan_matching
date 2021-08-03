@@ -25,3 +25,9 @@ target_link_libraries(hb2_thread PRIVATE ${catkin_LIBRARIES} scan_match csv kdtr
 add_executable(testLibpm testLibpm.cpp)
 add_dependencies(testLibpm ${catkin_EXPORTED_TARGETS})
 target_link_libraries(testLibpm PRIVATE ${catkin_LIBRARIES} ${ros_name_executable_name} scan_match csv kdtree ukf map debugging)
+
+
+add_executable(hb2_libpointmatcher hb2_libpointmatcher.cpp)
+add_dependencies(hb2_libpointmatcher ${catkin_EXPORTED_TARGETS})
+target_link_libraries(hb2_libpointmatcher PRIVATE ${catkin_LIBRARIES} ${ros_name_executable_name} scan_match csv kdtree ukf map debugging)
+
