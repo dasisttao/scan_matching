@@ -21,3 +21,7 @@ target_link_libraries(hb2_connect_simulink PRIVATE ${catkin_LIBRARIES} scan_matc
 add_executable(hb2_thread hb2_thread.cpp)
 add_dependencies(hb2_thread ${catkin_EXPORTED_TARGETS})
 target_link_libraries(hb2_thread PRIVATE ${catkin_LIBRARIES} scan_match csv kdtree ukf map debugging)
+
+add_executable(testLibpm testLibpm.cpp)
+add_dependencies(testLibpm ${catkin_EXPORTED_TARGETS})
+target_link_libraries(testLibpm PRIVATE ${catkin_LIBRARIES} ${ros_name_executable_name} scan_match csv kdtree ukf map debugging)

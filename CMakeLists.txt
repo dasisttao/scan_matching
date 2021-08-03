@@ -19,6 +19,9 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   pcl_conversions
   PCL REQUIRED
+
+  libpointmatcher_ros
+  libpointmatcher
 )
 
 catkin_package(
