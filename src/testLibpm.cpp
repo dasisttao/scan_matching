@@ -241,75 +241,18 @@ void callback_pcl(const PointCloud2::ConstPtr &point_cloud){
 
 
   PM::ICP icp;
+  std::string configFile = "src/icp_lokalisierung/scan_matching/cfg/testConfig.yaml"; 
+          std::ifstream ifs(configFile.c_str());
+          if (!ifs.good())
+          {
+            cerr << "Cannot open config file " << configFile << "\n"; exit(1);
+          }
+          icp.loadFromYaml(ifs);
+
   PointMatcherSupport::Parametrizable::Parameters params;
-  std::string name;
-
-  // Uncomment for console outputs
-	setLogger(PM::get().LoggerRegistrar.create("FileLogger"));
-
-
-  // Prepare matching function
-	name = "KDTreeMatcher";
-	params["knn"] = "1";
-	// params["epsilon"] = "3.16";
-	std::shared_ptr<PM::Matcher> kdtree =
-		PM::get().MatcherRegistrar.create(name, params);
-	params.clear();
-
-  // Prepare outlier filters
-	name = "TrimmedDistOutlierFilter";
-	params["ratio"] = "0.75";
-	std::shared_ptr<PM::OutlierFilter> trim =
-		PM::get().OutlierFilterRegistrar.create(name, params);
-	params.clear();
-
-  // Prepare error minimization
-  name = "PointToPointErrorMinimizer";
-  std::shared_ptr<PM::ErrorMinimizer> pointToPoint =   
-	PM::get().ErrorMinimizerRegistrar.create(name);
   
-
-  // Prepare transformation checker filters
-	name = "CounterTransformationChecker";
-	params["maxIterationCount"] = "40";
-	std::shared_ptr<PM::TransformationChecker> maxIter =
-		PM::get().TransformationCheckerRegistrar.create(name, params);
-	params.clear();  
-
-  name = "DifferentialTransformationChecker";
-	params["minDiffRotErr"] = "0.001";
-	params["minDiffTransErr"] = "0.01";
-	params["smoothLength"] = "4";
-	std::shared_ptr<PM::TransformationChecker> diff =
-		PM::get().TransformationCheckerRegistrar.create(name, params);
-	params.clear();
-
-  // Prepare inspector
-	std::shared_ptr<PM::Inspector> nullInspect =
-		PM::get().InspectorRegistrar.create("NullInspector");
-
-  // Prepare transformation
-	std::shared_ptr<PM::Transformation> rigidTrans =
-		PM::get().TransformationRegistrar.create("RigidTransformation");
-
-	icp.matcher = kdtree;
-	
-	icp.outlierFilters.push_back(trim);
-	
-	icp.errorMinimizer = pointToPoint;
-
-	icp.transformationCheckers.push_back(maxIter);
-	icp.transformationCheckers.push_back(diff);
-	
-	// toggle to write vtk files per iteration
-	icp.inspector = nullInspect;
-	//icp.inspector = vtkInspect;
-
-	icp.transformations.push_back(rigidTrans);
-
-
-  // Compute the transformation to express data in ref
-	PM::TransformationParameters T = icp(data, ref);
+	// Compute the transformation to express data in ref
+  PM::TransformationParameters T = icp(data, ref);
 
   cout << "Final transformation:" << endl << T << endl;
 
