@@ -78,7 +78,6 @@ void Vorausrichtung(sensor_msgs::PointCloud &pc, const State &state)
 
 
 
-
 void callback_init_pose(const geometry_msgs::PoseWithCovarianceStamped &pose_in)
 {
   tf::Quaternion q(
@@ -196,10 +195,10 @@ void pclCSV(const MyPointCloud2D & mypointcloud2d, std::string path)
       try
         {
             csvfile csv(path); // throws exceptions!
-            csv << 'x' << 'y' << 'z' << endrow;
+            csv << 'x' << 'y' <<  endrow;
             for (auto i = 0; i < mypointcloud2d.pts.size(); i++)
             {
-                csv << mypointcloud2d.pts[i].x << mypointcloud2d.pts[i].y << 0.0 << endrow;
+                csv << mypointcloud2d.pts[i].x << mypointcloud2d.pts[i].y << endrow;
             }
         }
         catch (const std::exception &ex)
@@ -209,6 +208,33 @@ void pclCSV(const MyPointCloud2D & mypointcloud2d, std::string path)
 
     }
 
+
+DP convertMyPointCloud2DtoPMDP(const MyPointCloud2D & mypointcloud2d)
+{
+  //  This function change MyPointCloud2D to PointMatcher::DataPoints
+  // Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> Matrix;
+  auto point_size = mypointcloud2d.pts.size();
+
+  MatrixXf featuresMatrix(3,point_size);
+  
+  for (auto i = 0; i < mypointcloud2d.pts.size(); i++)
+  {
+    featuresMatrix(0,i) = mypointcloud2d.pts[i].x;
+    featuresMatrix(1,i) = mypointcloud2d.pts[i].y;
+    featuresMatrix(2,i) = 1; //pad
+  } 
+
+  DP::Labels featLabels;
+	featLabels.push_back(DP::Label("x", 1));
+	featLabels.push_back(DP::Label("y", 1));
+	featLabels.push_back(DP::Label("pad", 1));
+  
+  // Construct the point cloud from the generated matrices
+	DP pointCloud = DP(featuresMatrix, featLabels);
+
+
+  return pointCloud;
+}
 
 
 void callback_pcl(const PointCloud2::ConstPtr &point_cloud){
@@ -231,14 +257,24 @@ void callback_pcl(const PointCloud2::ConstPtr &point_cloud){
   //--2--Pre-Allignment (Vorausrichtung)
   Matrix2d rotM = filter.allignScanPoints(scans, state);
   onlinePCL_to_vis = rviz.createPointCloud(scans, "ibeo_lux", 0);
+  
 
+  PointMatcher<float>::DataPoints data = convertMyPointCloud2DtoPMDP(scans);
 
-  PointMatcher<float>::DataPoints data = PointMatcher_ros::rosMsgToPointMatcherCloud<float>(onlinePCL_to_vis, false);
+  PointMatcher<float>::DataPoints ref = convertMyPointCloud2DtoPMDP(map_carpark);
 
+  // std::string source_path = "src/icp_lokalisierung/scan_matching/csv_output/pcl2D_source.csv";
+  // pclCSV(scans,source_path);
+
+  // // PointMatcher<float>::DataPoints data = PointMatcher_ros::rosMsgToPointMatcherCloud<float>(onlinePCL_to_vis, false);
+  // PointMatcher<float>::DataPoints data(DP::load(source_path.c_str()));
 
   offlineMap_to_vis = rviz.createPointCloud(map_carpark, "ibeo_lux", 0);
-  PointMatcher<float>::DataPoints ref = PointMatcher_ros::rosMsgToPointMatcherCloud<float>(offlineMap_to_vis, false);
+  // std::string target_path = "src/icp_lokalisierung/scan_matching/csv_output/pcl2D_map.csv";
+  // pclCSV(map_carpark,target_path.c_str());
 
+  // // PointMatcher<float>::DataPoints ref = PointMatcher_ros::rosMsgToPointMatcherCloud<float>(offlineMap_to_vis, false);
+  // PointMatcher<float>::DataPoints ref(DP::load(target_path.c_str()));
 
   PM::ICP icp;
   std::string configFile = "src/icp_lokalisierung/scan_matching/cfg/testConfig.yaml"; 
