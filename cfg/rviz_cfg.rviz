@@ -12,6 +12,7 @@ Panels:
         - /gps_pose1
         - /pose_estimated1
         - /laser_roh1
+        - /map2
       Splitter Ratio: 0.5
     Tree Height: 746
   - Class: rviz/Selection
@@ -158,7 +159,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
@@ -173,7 +174,35 @@ Visualization Manager:
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 252; 175; 62
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 28; 206; 255
+      Min Color: 71; 212; 227
+      Name: map
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.20000000298023224
+      Style: Flat Squares
+      Topic: /afterMatch
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -201,7 +230,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: -0.07000012695789337
+      Angle: 0.0449998676776886
       Class: rviz/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -211,10 +240,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Scale: 7.215162754058838
+      Scale: 28.213443756103516
       Target Frame: <Fixed Frame>
-      X: 68.54708099365234
-      Y: 77.57440948486328
+      X: 78.26165771484375
+      Y: 46.25249481201172
     Saved: ~
 Window Geometry:
   Displays:
