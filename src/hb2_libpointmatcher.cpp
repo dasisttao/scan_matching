@@ -40,11 +40,6 @@
 
 #include "pointmatcher/PointMatcher.h"
 
-#include "pointmatcher_ros/point_cloud.h"
-#include "pointmatcher_ros/transform.h"
-#include "pointmatcher_ros/get_params_from_server.h"
-#include "pointmatcher_ros/ros_logger.h"
-
 using namespace sensor_msgs;
 using namespace message_filters;
 using namespace geometry_msgs;
@@ -105,6 +100,8 @@ MyPointCloud2D createMyPointCloud(sensor_msgs::PointCloud msg)
   }
   return scan_points;
 }
+
+
 
 void saveMyPointCloudtoPCLXYZ(const MyPointCloud2D &mypointcloud2d, pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud){
   // Fill in the CloudIn data
@@ -201,6 +198,33 @@ State calcNewState(const State& state, const Eigen::Matrix4f &transform_M)
     return new_state;
 }
 
+State calcNewState_2D(const State& state, const Eigen::Matrix3f &transform_M)
+{
+    State new_state;
+    Vector2f new_pos;
+    Vector2f pos;
+    Matrix2f new_rot;
+    pos << state.x, state.y;
+
+    Matrix2f rot_M;
+    rot_M << transform_M(0,0), transform_M(0,1), transform_M(1,0), transform_M(1,1);
+
+    Vector2f trans_V;
+    trans_V << transform_M(0,2), transform_M(1,2);
+
+    new_pos = rot_M * pos + trans_V;
+
+    new_state.x = new_pos(0);
+    new_state.y = new_pos(1);
+    new_state.v = state.v;
+    new_state.yawr = state.yawr;
+
+
+    new_state.yaw = atan2(rot_M(1,0), rot_M(0,0));
+    new_state.yaw = state.yaw + new_state.yaw;
+
+    return new_state;
+}
 
 
 
@@ -227,8 +251,6 @@ void Vorausrichtung(sensor_msgs::PointCloud &pc, const State &state)
         pc.points[i].z = 0.0;
     }
 }
-
-
 
 void callback_init_pose(const geometry_msgs::PoseWithCovarianceStamped &pose_in)
 {
@@ -259,6 +281,92 @@ void callback_init_pose(const geometry_msgs::PoseWithCovarianceStamped &pose_in)
   rviz.displayEstimatedPose(state, pose_estimation);
   initial_pose_needed = false;
 }
+
+
+
+DP convertMyPointCloud2DtoPMDP(const MyPointCloud2D & mypointcloud2d)
+{
+  //  This function change MyPointCloud2D to PointMatcher::DataPoints
+  // Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> Matrix;
+  auto point_size = mypointcloud2d.pts.size();
+
+  MatrixXf featuresMatrix(3,point_size);
+  
+  for (auto i = 0; i < mypointcloud2d.pts.size(); i++)
+  {
+    featuresMatrix(0,i) = mypointcloud2d.pts[i].x;
+    featuresMatrix(1,i) = mypointcloud2d.pts[i].y;
+    featuresMatrix(2,i) = 1; //pad
+  } 
+
+  DP::Labels featLabels;
+	featLabels.push_back(DP::Label("x", 1));
+	featLabels.push_back(DP::Label("y", 1));
+	featLabels.push_back(DP::Label("pad", 1));
+  
+  // Construct the point cloud from the generated matrices
+	DP pointCloud = DP(featuresMatrix, featLabels);
+
+
+  return pointCloud;
+}
+
+
+
+sensor_msgs::PointCloud2 convert_PMDP_toSensor_Stard_PointClooud2(const DP& dppm, string frame_id, float height)
+{
+    sensor_msgs::PointCloud pc;
+    pc.points.resize(dppm.getNbPoints());
+    pc.header.frame_id = frame_id;
+    pc.header.stamp = ros::Time::now();
+
+    sensor_msgs::ChannelFloat32 depth_channel;
+
+    for (int i = 0; i < dppm.getNbPoints(); i++)
+    {
+        pc.points[i].x = dppm.features(0,i);
+        pc.points[i].y = dppm.features(1,i);
+        pc.points[i].z = height;
+        depth_channel.values.push_back(1);
+    }
+    pc.channels.push_back(depth_channel);
+    sensor_msgs::PointCloud2 pc2;
+    sensor_msgs::convertPointCloudToPointCloud2(pc, pc2);
+    return pc2;
+
+    
+}
+
+
+
+DP convert_std_PoinCloud_toPMDP(const sensor_msgs::PointCloud& std_pcl)
+{
+
+  auto point_size = std_pcl.points.size();
+
+  MatrixXf featuresMatrix(3,point_size);
+  
+  for (auto i = 0; i < point_size; i++)
+  {
+    featuresMatrix(0,i) = std_pcl.points[i].x; 
+    featuresMatrix(1,i) = std_pcl.points[i].y; 
+    featuresMatrix(2,i) = 1; //pad
+  } 
+
+  DP::Labels featLabels;
+	featLabels.push_back(DP::Label("x", 1));
+	featLabels.push_back(DP::Label("y", 1));
+	featLabels.push_back(DP::Label("pad", 1));
+  
+  // Construct the point cloud from the generated matrices
+	DP pointCloud = DP(featuresMatrix, featLabels);
+
+  return pointCloud;
+
+}
+
+
+
 
 void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::ConstPtr &can_data)
 {
@@ -311,6 +419,13 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
         //Filter roof scans
         pc = filter.filterLaserChannel(pc);
 
+        if (filter.is_this_frame_has_4to7Layer_PCL == true){
+          std::cout << "This frame has 4 to 7 Layer Point Cloud \n";
+          return;
+        }
+        
+
+        // PointMatcher<float>::DataPoints data_test = convert_std_PoinCloud_toPMDP(pc);
         //Create ScanPoints vector for better handling
         MyPointCloud2D scans = createMyPointCloud(pc);
 
@@ -318,39 +433,46 @@ void callback(const PointCloud2::ConstPtr &point_cloud, const autobox_out::Const
         //--0--Reducing ScanPoints
         scans = filter.getScanPointsWithinThreshold(scans);
 
-
         //--1--Pre-Allignment (Vorausrichtung) + change formate in order to use libpointmatcher
         Matrix2d rotM = filter.allignScanPoints(scans, state);
-        pc2 = rviz.createPointCloud(scans, "ibeo_lux", 0);
-        PointMatcher<float>::DataPoints data = PointMatcher_ros::rosMsgToPointMatcherCloud<float>(pc2, false);
+        PointMatcher<float>::DataPoints data_PM = convertMyPointCloud2DtoPMDP(scans);
 
-
+        static PointMatcher<float>::DataPoints ref_PM;
         //--2--Reduce points in map + change formate in order to use libpointmatcher
-        MyPointCloud2D map_filt = filter.reduceMap(map_carpark, state);
-        map_pc = rviz.createPointCloud(map_filt, "ibeo_lux", 0);
-        PointMatcher<float>::DataPoints ref = PointMatcher_ros::rosMsgToPointMatcherCloud<float>(map_pc, false);
+        if (map_carpark_change == true){
+          MyPointCloud2D map_filt = filter.reduceMap(map_carpark, state);
+          map_pc = rviz.createPointCloud(map_filt, "ibeo_lux", 0);
+          ref_PM = convertMyPointCloud2DtoPMDP(map_filt);
+          map_carpark_change = false;
+        }
+        
 
         //--3--ICP using libpointmatcher with yaml to configure the filter
 
           // Get Filter to be used in ICP from yaml Config file
-          PM::ICP icp;
-          std::string configFile = "src/icp_lokalisierung/scan_matching/cfg/ICP_config.yaml"; 
-          std::ifstream ifs(configFile.c_str());
-          if (!ifs.good())
-          {
-            cerr << "Cannot open config file " << configFile << "\n"; exit(1);
+          static PM::ICP icp;
+          static std::string configFile = "src/icp_lokalisierung/scan_matching/cfg/ICP_config.yaml"; 
+          static std::ifstream ifs(configFile.c_str());
+          static bool if_load_stream_filter = false;
+          if (if_load_stream_filter==false){
+            if (!ifs.good())
+            {
+              cerr << "Cannot open config file " << configFile << "\n"; exit(1);
+            }
+            icp.loadFromYaml(ifs);
+            if_load_stream_filter = true;
           }
-          icp.loadFromYaml(ifs);
 
           // Compute the transformation to express data in ref
-          PM::TransformationParameters T = icp(data, ref);
+          PM::TransformationParameters T_PM = icp(data_PM, ref_PM);
           // Change the pointcloud form laser so it can be visualized 
-          icp.transformations.apply(data, T);
-          // Get the ICP state
-          icp_state = calcNewState(state,T);
-          // update pc2 to visulize the changed pointcloud
-          pc2 = PointMatcher_ros::pointMatcherCloudToRosMsg<float>(data, "ibeo_lux", ros::Time::now());
 
+          icp.transformations.apply(data_PM, T_PM);
+          // Get the ICP state
+          icp_state = calcNewState_2D(state,T_PM);
+
+          // update pc2 to visulize the changed pointcloud
+          pc2 = convert_PMDP_toSensor_Stard_PointClooud2(data_PM,"ibeo_lux",1);  
 
         // UKF Update with ICP State  
         ukf_filter.UpdateLaser(icp_state);

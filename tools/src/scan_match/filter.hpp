@@ -23,7 +23,7 @@ public:
     Matrix2d allignScanPoints(MyPointCloud2D &scans, const State &state);
     MyPointCloud2D reduceMap(MyPointCloud2D map_carpark, const State &state);
     sensor_msgs::PointCloud filterLaserChannel(sensor_msgs::PointCloud pc);
-
+    bool is_this_frame_has_4to7Layer_PCL = true;
 public:
     float longi_max = 85;
     float longi_min = -85;

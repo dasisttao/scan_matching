@@ -20,7 +20,9 @@ geometry_msgs::PoseStamped gps_pose, pose_estimation, pose_test;
 RVIZ rviz;
 MyMap my_map;
 sensor_msgs::PointCloud2 pc2, map_pc;
-MyPointCloud2D map_carpark;
+MyPointCloud2D map_carpark;  // this is for save offline map, it can change when the floor change. Check Floor.h
+bool map_carpark_change {false}; 
+
 class MYINIT{
 public:
 
@@ -127,6 +129,7 @@ public:
   void loadOfflineMap(){
     std::cout << "Loading Offline Map ..."<< std::endl;
     my_map.readRawData(map_pc, map_carpark,"src/icp_lokalisierung/scan_matching/map/map_Elphi_R0_E1_Bauplan_reduced.csv");
+    map_carpark_change = true;
     std::cout << "  Map loaded!"<< std::endl;
   }
 

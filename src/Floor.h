@@ -121,6 +121,7 @@ class FLOOR{
             printFloor();
             std::cout << "\n change map from map 1 RO_E1 to map 2 E1_E0\n";
             my_map.readRawData(map_pc, map_carpark,"src/icp_lokalisierung/scan_matching/map/map_Elphi_E1_E0_Bauplan_reduced.csv");
+            map_carpark_change = true;
         }
 
       else if( (state.x > E1_R12_x1 ) && (state.x < E1_R12_x2 ) && (state.y > E1_R12_y1 ) && (state.y < E1_R12_y2 )){
@@ -128,6 +129,7 @@ class FLOOR{
             printFloor();
             std::cout << "\n change map from map 1 RO_E1 to map 3 R12\n";
             my_map.readRawData(map_pc, map_carpark,"src/icp_lokalisierung/scan_matching/map/map_Elphi_R12_Bauplan_reduced.csv");
+            map_carpark_change = true;
         }
     }
     else if(caronfloor == CarOnFloor::R10){
@@ -143,6 +145,7 @@ class FLOOR{
           printFloor();
           std::cout << "\n change map from map 3 R12 to ma4 3 E2\n";
           my_map.readRawData(map_pc, map_carpark,"src/icp_lokalisierung/scan_matching/map/map_Elphi_E2_Bauplan_reduced.csv");    
+          map_carpark_change = true;
         }
     }
     else if(caronfloor == CarOnFloor::E2){
@@ -151,6 +154,7 @@ class FLOOR{
           printFloor();
           std::cout << "\n change map from map 4 E2 to map 5 R21\n";     
           my_map.readRawData(map_pc, map_carpark,"src/icp_lokalisierung/scan_matching/map/map_Elphi_R21.csv"); 
+          map_carpark_change = true;
         }
     }
     else if(caronfloor == CarOnFloor::R21){
@@ -165,6 +169,7 @@ class FLOOR{
           printFloor();
           std::cout << "\n change map from map 5 R21 to map 1 R0_R1\n";
           my_map.readRawData(map_pc, map_carpark,"src/icp_lokalisierung/scan_matching/map/map_Elphi_R0_E1_Bauplan_reduced.csv");
+          map_carpark_change = true;
         }
     }
 

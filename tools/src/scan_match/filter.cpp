@@ -129,12 +129,19 @@ sensor_msgs::PointCloud Filter::filterLaserChannel(sensor_msgs::PointCloud pc)
 
     for (int i = 0; i < pc.channels[0].values.size(); i++)
     {
+        // IBEO-LUX-8L use two configuration of sensor to get 8 layer pointcloud
+        // For Data consistency, the frames which contain layer from 4-7 is ignored
+        if (  (pc.channels[0].values[i] == 4) ||
+              (pc.channels[0].values[i] == 5) ||
+              (pc.channels[0].values[i] == 6) ||
+              (pc.channels[0].values[i] == 7) 
+        ){
+            is_this_frame_has_4to7Layer_PCL = true;
+            return new_pc; 
+        }
         if (! (
                     (pc.channels[0].values[i] == 0) 
                 ||  (pc.channels[0].values[i] == 3) 
-                ||  (pc.channels[0].values[i] == 4) 
-                ||  (pc.channels[0].values[i] == 5) 
-                ||  (pc.channels[0].values[i] == 6) 
               ) 
             )
         {
@@ -142,6 +149,7 @@ sensor_msgs::PointCloud Filter::filterLaserChannel(sensor_msgs::PointCloud pc)
             new_pc.points.push_back(pc.points[i]);
         }
     }
+    is_this_frame_has_4to7Layer_PCL = false;
     new_pc.channels.push_back(channel);
     return new_pc;
 }
